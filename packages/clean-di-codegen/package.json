@@ -39,7 +39,8 @@
     }
   },
   "devDependencies": {
-    "clean-di": "workspace:*"
+    "clean-di": "workspace:*",
+    "@types/node": "^20.0.0"
   },
   "publishConfig": {
     "access": "public"
