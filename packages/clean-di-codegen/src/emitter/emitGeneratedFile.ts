@@ -52,19 +52,25 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
   const checker = program.getTypeChecker();
 
   const parsed = parseDiFile(program, sourcePath);
-  const contexts = collectContexts(parsed);
+  const { contexts, diagnostics: shapeDiagnostics } = collectContexts(parsed);
+
+  const allDiagnostics: Diagnostic[] = [...shapeDiagnostics];
 
   if (contexts.length === 0) {
-    // No defineContext call — nothing to emit. Treat as a no-op skip.
-    return { wrote: false, diagnostics: [], outputPath };
+    // No well-formed defineContext call. If shape diagnostics fired, surface
+    // them through the reporter; otherwise treat as a no-op skip.
+    for (const d of allDiagnostics) {
+      reporter.add(d);
+    }
+
+    return { wrote: false, diagnostics: allDiagnostics, outputPath };
   }
 
-  // W3 MVP supports a single context per file. Take the first.
+  // W3 MVP supports a single context per file. Take the first well-formed one.
   const context = contexts[0]!;
   const localScope = buildBeanScope(checker, context);
 
   // 3b: resolve each bean's constructor.
-  const allDiagnostics: Diagnostic[] = [];
   const resolvedArgs = new Map<string, readonly (string | null)[]>();
   const constructorSigSnapshot: string[] = [];
 

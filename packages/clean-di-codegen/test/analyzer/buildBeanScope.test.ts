@@ -98,7 +98,7 @@ describe("buildBeanScope() — MVP, locals only", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const scope = buildBeanScope(program.getTypeChecker(), ctx);
 
     expect(Array.from(scope.keys())).toEqual(["foo", "bar", "id"]);
@@ -119,7 +119,7 @@ describe("buildBeanScope() — MVP, locals only", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const scope = buildBeanScope(program.getTypeChecker(), ctx);
 
     const loggerEntry = scope.get("logger")!;
@@ -144,7 +144,7 @@ describe("buildBeanScope() — MVP, locals only", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const scope = buildBeanScope(program.getTypeChecker(), ctx);
 
     expect(scope.get("useCase")!.overrides).toEqual({ repo: "repo" });
@@ -164,7 +164,7 @@ describe("buildBeanScope() — MVP, locals only", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const scope = buildBeanScope(program.getTypeChecker(), ctx);
 
     const entry = scope.get("name")!;
@@ -190,7 +190,7 @@ describe("buildBeanScope() — MVP, locals only", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const scope = buildBeanScope(program.getTypeChecker(), ctx);
 
     expect(Array.from(scope.keys())).toEqual(["c", "a", "b"]);
