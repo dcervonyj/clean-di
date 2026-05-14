@@ -36,4 +36,5 @@ jobs:
 
       - run: pnpm build
 
-      # TODO(W6): add 'pnpm clean-di-codegen --check' step once CLI is published
+      - name: Check generated files are up to date
+        run: pnpm --filter clean-di-codegen check:examples

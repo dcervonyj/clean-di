@@ -20,6 +20,7 @@
   ],
   "scripts": {
     "build": "tsc -b",
+    "check:examples": "node dist/bin.js --check",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
