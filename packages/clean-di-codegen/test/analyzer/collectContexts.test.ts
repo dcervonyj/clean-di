@@ -348,6 +348,126 @@ describe("collectContexts()", () => {
     expect(resultUnknown.contexts[0]!.configTypeName).toBe("unknown");
   });
 
+  it("emits CDI-007 for a plain object RHS", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext } from "clean-di";
+       export const ctx = defineContext()({
+         beans: {
+           foo: { fake: true },
+         },
+         expose: [] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const result = collectContexts(parsed);
+
+    expect(result.contexts).toHaveLength(1);
+    expect(result.contexts[0]!.beans).toHaveLength(0);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-007");
+    expect(result.diagnostics[0]!.message).toMatch(/foo/);
+  });
+
+  it("emits CDI-007 for an arrow-function RHS", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext } from "clean-di";
+       export const ctx = defineContext()({
+         beans: {
+           baz: () => 42,
+         },
+         expose: [] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const result = collectContexts(parsed);
+
+    expect(result.contexts).toHaveLength(1);
+    expect(result.contexts[0]!.beans).toHaveLength(0);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-007");
+    expect(result.diagnostics[0]!.message).toMatch(/baz/);
+  });
+
+  it("emits CDI-007 for a non-bean / non-provide RHS (class reference and raw call)", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext } from "clean-di";
+       class SomeClass {
+         private readonly tag = "x";
+         use(): void { void this.tag; }
+       }
+       function makeThing(): number { return 1; }
+       export const ctx = defineContext()({
+         beans: {
+           bar: SomeClass,
+           qux: makeThing(),
+         },
+         expose: [] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const result = collectContexts(parsed);
+
+    expect(result.contexts).toHaveLength(1);
+    expect(result.contexts[0]!.beans).toHaveLength(0);
+    expect(result.diagnostics).toHaveLength(2);
+    expect(result.diagnostics.map((d) => d.code)).toEqual(["CDI-007", "CDI-007"]);
+    expect(result.diagnostics[0]!.message).toMatch(/bar/);
+    expect(result.diagnostics[1]!.message).toMatch(/qux/);
+  });
+
+  it("valid bean(...) and provide(...) entries pass without CDI-007", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean, provide } from "clean-di";
+       class Foo {}
+       export const ctx = defineContext()({
+         beans: {
+           foo: bean(Foo),
+           pi: provide(() => Math.PI),
+         },
+         expose: ["foo", "pi"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const result = collectContexts(parsed);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.contexts).toHaveLength(1);
+    expect(result.contexts[0]!.beans.map((b) => b.name)).toEqual(["foo", "pi"]);
+    expect(result.contexts[0]!.beans.map((b) => b.kind)).toEqual(["bean", "provide"]);
+  });
+
+  it("emits CDI-007 only for invalid entries — valid ones in the same context still pass through", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       class Foo {}
+       export const ctx = defineContext()({
+         beans: {
+           foo: bean(Foo),
+           bogus: { not: "a bean" },
+         },
+         expose: ["foo"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const result = collectContexts(parsed);
+
+    expect(result.contexts).toHaveLength(1);
+    expect(result.contexts[0]!.beans.map((b) => b.name)).toEqual(["foo"]);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-007");
+    expect(result.diagnostics[0]!.message).toMatch(/bogus/);
+  });
+
   it("still returns well-formed contexts alongside malformed ones", async () => {
     const { program, filePath, cleanup } = await buildFixture(
       `import { defineContext, bean } from "clean-di";
