@@ -1,13 +1,19 @@
 import ts from "typescript";
 
 import type { Diagnostic } from "../diagnostics/codes.js";
-import type { BeanScope } from "./buildBeanScope.js";
+import type { BeanScope, BeanScopeEntry } from "./buildBeanScope.js";
 import { resolveOneParam } from "./resolveOneParam.js";
 
 export interface ResolveConstructorInput {
   readonly classDeclaration: ts.ClassDeclaration;
   readonly scope: BeanScope;
   readonly checker: ts.TypeChecker;
+  /**
+   * The bean entry whose constructor we're resolving — supplies the override
+   * map for `resolveOneParam`. Optional for backward compatibility with W3
+   * callers; when absent, parameters resolve by type matching only.
+   */
+  readonly ownerEntry?: BeanScopeEntry;
 }
 
 export interface ResolveConstructorResult {
@@ -36,7 +42,7 @@ export interface ResolveConstructorResult {
  *    diagnostics.
  */
 export function resolveConstructor(input: ResolveConstructorInput): ResolveConstructorResult {
-  const { classDeclaration, scope, checker } = input;
+  const { classDeclaration, scope, checker, ownerEntry } = input;
   const ctor = findFirstConstructor(classDeclaration);
 
   // No constructor declared — default no-arg constructor.
@@ -79,7 +85,7 @@ export function resolveConstructor(input: ResolveConstructorInput): ResolveConst
       };
     }
 
-    const result = resolveOneParam({ param, scope, checker });
+    const result = resolveOneParam({ param, scope, checker, ownerEntry });
     args.push(result.beanName);
     diagnostics.push(...result.diagnostics);
   }

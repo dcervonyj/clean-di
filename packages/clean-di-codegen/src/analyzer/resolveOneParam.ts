@@ -1,7 +1,7 @@
 import ts from "typescript";
 
 import type { Diagnostic } from "../diagnostics/codes.js";
-import type { BeanScope } from "./buildBeanScope.js";
+import type { BeanScope, BeanScopeEntry } from "./buildBeanScope.js";
 
 export interface ResolveParamInput {
   /** Parameter to resolve. */
@@ -10,6 +10,12 @@ export interface ResolveParamInput {
   readonly scope: BeanScope;
   /** TS type checker (from the program). */
   readonly checker: ts.TypeChecker;
+  /**
+   * The bean entry whose constructor we're resolving. Supplies the `overrides`
+   * map (the W4 escape hatch). Optional — when absent, resolution falls back
+   * to the W3 type-matching behavior only.
+   */
+  readonly ownerEntry?: BeanScopeEntry;
 }
 
 export interface ResolveParamResult {
@@ -22,20 +28,37 @@ export interface ResolveParamResult {
 }
 
 /**
- * MVP resolver: filter bean scope by type assignability, pick the unique match.
+ * Resolver for one constructor parameter against the bean scope.
  *
- * v3 supports type matching only. Overrides (W4 — T-043) and parameter-name
- * fallback (W4 — T-044) extend this in place.
+ * Resolution order (DESIGN §7.3 step 3):
+ *  1. **Override** — if `ownerEntry.overrides[paramName]` is set, the named
+ *     bean wins outright. If it doesn't exist in scope or its type doesn't
+ *     match the parameter type, emit `CDI-001` with a hint pointing at the
+ *     override (the user explicitly asked for it — don't silently fall back).
+ *  2. **Type matching** — filter the scope by `isTypeAssignableTo` and pick
+ *     the unique match. Zero matches on a required param → `CDI-001`. Zero
+ *     matches on an optional param → silently skip. Multiple matches → `CDI-002`.
  *
- * Semantics:
- *  - Exactly one type match → return its name.
- *  - Zero matches and param is optional → return null, skippedAsOptional = true.
- *  - Zero matches and param is required → emit CDI-001, return null.
- *  - Multiple matches → emit CDI-002, return null.
+ * Name fallback (W4 — T-044) extends this in place.
  */
 export function resolveOneParam(input: ResolveParamInput): ResolveParamResult {
-  const { param, scope, checker } = input;
+  const { param, scope, checker, ownerEntry } = input;
+  const paramName = param.name.getText();
   const paramType = checker.getTypeAtLocation(param);
+  const position = getParamPosition(param);
+
+  // Step 3a — explicit override wins over type matching.
+  const overrideTarget = ownerEntry?.overrides[paramName];
+  if (overrideTarget !== undefined) {
+    return resolveByOverride({
+      overrideTarget,
+      paramName,
+      paramType,
+      scope,
+      checker,
+      position,
+    });
+  }
 
   const matches: string[] = [];
   for (const [name, entry] of scope) {
@@ -47,7 +70,6 @@ export function resolveOneParam(input: ResolveParamInput): ResolveParamResult {
   }
 
   const isOptional = isOptionalParam(param);
-  const position = getParamPosition(param);
 
   if (matches.length === 1) {
     return { beanName: matches[0]!, skippedAsOptional: false, diagnostics: [] };
@@ -58,7 +80,6 @@ export function resolveOneParam(input: ResolveParamInput): ResolveParamResult {
       return { beanName: null, skippedAsOptional: true, diagnostics: [] };
     }
 
-    const paramName = param.name.getText();
     const typeText = checker.typeToString(paramType);
     return {
       beanName: null,
@@ -77,7 +98,6 @@ export function resolveOneParam(input: ResolveParamInput): ResolveParamResult {
   }
 
   // matches.length > 1 — ambiguous
-  const paramName = param.name.getText();
   return {
     beanName: null,
     skippedAsOptional: false,
@@ -92,6 +112,60 @@ export function resolveOneParam(input: ResolveParamInput): ResolveParamResult {
       },
     ],
   };
+}
+
+interface ResolveByOverrideInput {
+  readonly overrideTarget: string;
+  readonly paramName: string;
+  readonly paramType: ts.Type;
+  readonly scope: BeanScope;
+  readonly checker: ts.TypeChecker;
+  readonly position: { file: string; line: number; column: number };
+}
+
+function resolveByOverride(input: ResolveByOverrideInput): ResolveParamResult {
+  const { overrideTarget, paramName, paramType, scope, checker, position } = input;
+
+  const overrideEntry = scope.get(overrideTarget);
+  if (overrideEntry === undefined) {
+    return {
+      beanName: null,
+      skippedAsOptional: false,
+      diagnostics: [
+        {
+          code: "CDI-001",
+          file: position.file,
+          line: position.line,
+          column: position.column,
+          message: `UnresolvableDependency: override for parameter "${paramName}" targets bean "${overrideTarget}", which does not exist in scope.`,
+          hint: `Declare a bean named "${overrideTarget}" in this context, import it, or correct the override target.`,
+        },
+      ],
+    };
+  }
+
+  const overrideType = getBeanType(checker, overrideEntry);
+  if (overrideType === undefined || !checker.isTypeAssignableTo(overrideType, paramType)) {
+    const paramTypeText = checker.typeToString(paramType);
+    const overrideTypeText =
+      overrideType !== undefined ? checker.typeToString(overrideType) : "<unknown>";
+    return {
+      beanName: null,
+      skippedAsOptional: false,
+      diagnostics: [
+        {
+          code: "CDI-001",
+          file: position.file,
+          line: position.line,
+          column: position.column,
+          message: `UnresolvableDependency: override for parameter "${paramName}" targets bean "${overrideTarget}" of type "${overrideTypeText}", which is not assignable to parameter type "${paramTypeText}".`,
+          hint: `Point the override at a bean whose type is assignable to "${paramTypeText}", or remove the override and let type matching pick a bean.`,
+        },
+      ],
+    };
+  }
+
+  return { beanName: overrideTarget, skippedAsOptional: false, diagnostics: [] };
 }
 
 /**
