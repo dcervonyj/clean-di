@@ -247,6 +247,103 @@ describe("collectContexts()", () => {
     expect(result.diagnostics[0]!.message).toMatch(/beans/);
   });
 
+  it("emits CDI-009 when the config type cannot be resolved", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       class Foo {}
+       // MissingConfig is intentionally not imported and not declared.
+       export const ctx = defineContext<MissingConfig>()({
+         beans: { foo: bean(Foo) },
+         expose: ["foo"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const result = collectContexts(parsed);
+
+    expect(result.contexts).toHaveLength(0);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-009");
+    expect(result.diagnostics[0]!.message).toMatch(/MissingConfig/);
+  });
+
+  it("does NOT emit CDI-009 when TConfig is omitted (void)", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       class Foo {}
+       export const ctx = defineContext()({
+         beans: { foo: bean(Foo) },
+         expose: ["foo"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const result = collectContexts(parsed);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.contexts).toHaveLength(1);
+    expect(result.contexts[0]!.configTypeName).toBe("void");
+  });
+
+  it("does NOT emit CDI-009 when TConfig is the `void` keyword", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       class Foo {}
+       export const ctx = defineContext<void>()({
+         beans: { foo: bean(Foo) },
+         expose: ["foo"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const result = collectContexts(parsed);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.contexts).toHaveLength(1);
+    expect(result.contexts[0]!.configTypeName).toBe("void");
+  });
+
+  it("does NOT emit CDI-009 when TConfig is `any` or `unknown` (intentional)", async () => {
+    const { program: programAny, filePath: filePathAny, cleanup: cleanupAny } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       class Foo {}
+       export const ctx = defineContext<any>()({
+         beans: { foo: bean(Foo) },
+         expose: ["foo"] as const,
+       });`,
+    );
+
+    const parsedAny = parseDiFile(programAny, filePathAny);
+    const resultAny = collectContexts(parsedAny);
+    expect(resultAny.diagnostics).toEqual([]);
+    expect(resultAny.contexts).toHaveLength(1);
+    expect(resultAny.contexts[0]!.configTypeName).toBe("any");
+    await cleanupAny();
+
+    const {
+      program: programUnknown,
+      filePath: filePathUnknown,
+      cleanup: cleanupUnknown,
+    } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       class Foo {}
+       export const ctx = defineContext<unknown>()({
+         beans: { foo: bean(Foo) },
+         expose: ["foo"] as const,
+       });`,
+    );
+    cleanupFn = cleanupUnknown;
+
+    const parsedUnknown = parseDiFile(programUnknown, filePathUnknown);
+    const resultUnknown = collectContexts(parsedUnknown);
+    expect(resultUnknown.diagnostics).toEqual([]);
+    expect(resultUnknown.contexts).toHaveLength(1);
+    expect(resultUnknown.contexts[0]!.configTypeName).toBe("unknown");
+  });
+
   it("still returns well-formed contexts alongside malformed ones", async () => {
     const { program, filePath, cleanup } = await buildFixture(
       `import { defineContext, bean } from "clean-di";

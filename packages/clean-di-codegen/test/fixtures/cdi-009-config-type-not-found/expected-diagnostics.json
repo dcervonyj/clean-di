@@ -1,0 +1,7 @@
+[
+  {
+    "code": "CDI-009",
+    "file": "input.di.ts",
+    "messageMatches": "MissingConfig"
+  }
+]

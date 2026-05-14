@@ -54,6 +54,7 @@ export interface CollectContextsResult {
 export function collectContexts(parsed: ParsedDiFile): CollectContextsResult {
   const contexts: ContextDeclaration[] = [];
   const diagnostics: Diagnostic[] = [];
+  const checker = parsed.program.getTypeChecker();
 
   for (const call of parsed.calls) {
     if (call.kind !== "defineContext") continue;
@@ -93,9 +94,16 @@ export function collectContexts(parsed: ParsedDiFile): CollectContextsResult {
       continue;
     }
 
+    const configType = extractConfigType(checker, call.node);
+    if (!configType.resolved) {
+      diagnostics.push(cdi009(configType.node ?? call.node, configType.typeName));
+      // Skip the context to mirror CDI-005 behavior on malformed input.
+      continue;
+    }
+
     contexts.push({
       exportName: extractExportName(innerCall),
-      configTypeName: extractConfigTypeName(call.node),
+      configTypeName: configType.typeName,
       beans: extractBeans(spec),
       expose: extractExposeList(spec),
       postConstruct: extractHook(spec, "postConstruct"),
@@ -146,18 +154,71 @@ function extractExportName(call: ts.CallExpression): string {
   return "unnamed";
 }
 
-function extractConfigTypeName(outerCall: ts.CallExpression): string {
+interface ExtractedConfigType {
+  /** Display name for the `<TConfig>` slot — `"void"` when omitted. */
+  readonly typeName: string;
+  /** True when the checker resolved the reference (or it was intentionally `void` / absent). */
+  readonly resolved: boolean;
+  /** The original type-node, kept for diagnostic positioning. */
+  readonly node: ts.TypeNode | undefined;
+}
+
+/**
+ * Pull the `<TConfig>` argument from `defineContext<TConfig>()` and ask the
+ * checker to resolve it. We only flag a CDI-009 for a *type reference* node
+ * whose symbol/alias the checker couldn't find — primitive keywords (`void`,
+ * `any`, `unknown`, etc.) and the omitted case are always treated as resolved
+ * because they are not type lookups by the user.
+ */
+function extractConfigType(
+  checker: ts.TypeChecker,
+  outerCall: ts.CallExpression,
+): ExtractedConfigType {
   const typeArgs = outerCall.typeArguments;
   if (typeArgs === undefined || typeArgs.length === 0) {
-    return "void";
+    return { typeName: "void", resolved: true, node: undefined };
   }
 
-  const first = typeArgs[0]!;
-  if (ts.isTypeReferenceNode(first) && ts.isIdentifier(first.typeName)) {
-    return first.typeName.text;
+  const node = typeArgs[0]!;
+  if (node.kind === ts.SyntaxKind.VoidKeyword) {
+    return { typeName: "void", resolved: true, node };
   }
 
-  return first.getText();
+  // For non-reference type nodes (intersection, union, literal, keyword like
+  // `any`/`unknown`/`never`), there's nothing to "look up" — accept verbatim.
+  if (!ts.isTypeReferenceNode(node)) {
+    return { typeName: displayName(node), resolved: true, node };
+  }
+
+  const resolved = isTypeReferenceResolved(checker, node);
+
+  return { typeName: displayName(node), resolved, node };
+}
+
+/**
+ * Probe whether the root identifier of a type-reference resolves to a real
+ * declaration in scope. The checker silently substitutes `any` when a name
+ * doesn't bind — so we look up the identifier directly via `resolveName` with
+ * `SymbolFlags.Type`. An `undefined` symbol means the name is unknown.
+ */
+function isTypeReferenceResolved(checker: ts.TypeChecker, node: ts.TypeReferenceNode): boolean {
+  const root = getRootIdentifier(node.typeName);
+  const symbol = checker.resolveName(root.text, root, ts.SymbolFlags.Type, false);
+
+  return symbol !== undefined;
+}
+
+/** Return the leftmost identifier of a (possibly qualified) entity name. */
+function getRootIdentifier(name: ts.EntityName): ts.Identifier {
+  return ts.isIdentifier(name) ? name : getRootIdentifier(name.left);
+}
+
+function displayName(node: ts.TypeNode): string {
+  if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) {
+    return node.typeName.text;
+  }
+
+  return node.getText();
 }
 
 function findProperty(
@@ -287,5 +348,19 @@ function cdi005(node: ts.Node, detail: string): Diagnostic {
     column: character + 1,
     message: `${DEFAULT_MESSAGES["CDI-005"]} ${detail}.`,
     hint: DEFAULT_HINTS["CDI-005"],
+  };
+}
+
+function cdi009(node: ts.Node, typeName: string): Diagnostic {
+  const source = node.getSourceFile();
+  const { line, character } = source.getLineAndCharacterOfPosition(node.getStart());
+
+  return {
+    code: "CDI-009",
+    file: source.fileName,
+    line: line + 1,
+    column: character + 1,
+    message: `${DEFAULT_MESSAGES["CDI-009"]} Cannot find type '${typeName}'.`,
+    hint: DEFAULT_HINTS["CDI-009"],
   };
 }
