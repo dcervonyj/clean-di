@@ -1,0 +1,56 @@
+{
+  "name": "clean-di-codegen",
+  "version": "0.0.0",
+  "description": "Build-time codegen CLI for clean-di. Reads .di.ts files and emits .di.generated.ts wiring.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "clean-di-codegen": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.0",
+    "picocolors": "^1.0.0",
+    "mri": "^1.2.0"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": { "optional": false }
+  },
+  "devDependencies": {
+    "clean-di": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clean-di/clean-di.git"
+  },
+  "keywords": [
+    "dependency-injection",
+    "di",
+    "codegen",
+    "typescript",
+    "cli"
+  ]
+}

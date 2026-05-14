@@ -1,0 +1,31 @@
+{
+  "name": "clean-di-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "typecheck": "pnpm -r run typecheck",
+    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo coverage"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitest/coverage-v8": "^3.0.5",
+    "eslint": "^8.57.1",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-unused-imports": "^3.2.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}
