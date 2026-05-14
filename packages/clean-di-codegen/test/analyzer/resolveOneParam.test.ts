@@ -331,6 +331,45 @@ describe("resolveOneParam() — MVP, type matching only", () => {
     expect(result.diagnostics[0]!.message).toMatch(/not assignable/);
   });
 
+  it("resolves a parameter against a synthetic config bean by name when type matches (T-046)", async () => {
+    // A `cfg.apiUrl: string` synthetic entry should be reachable by a
+    // constructor parameter `apiUrl: string` via the standard type-matching
+    // path, with no explicit `bean(...)` / `provide(...)` declaration.
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       type AppConfig = { apiUrl: string };
+       export class HttpClient {
+         private readonly tag = "http";
+         constructor(public apiUrl: string) {}
+       }
+       export const ctx = defineContext<AppConfig>()({
+         beans: { httpClient: bean(HttpClient) },
+         expose: ["httpClient"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const checker = program.getTypeChecker();
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed, checker).contexts[0]!;
+    const scope = buildBeanScope(checker, ctx);
+
+    // Sanity check: the synthetic entry is in scope.
+    expect(scope.get("apiUrl")).toBeDefined();
+    expect(scope.get("apiUrl")!.kind).toBe("config");
+
+    const params = getConstructorParams(parsed.sourceFile, "HttpClient");
+    const result = resolveOneParam({
+      param: params[0]!,
+      scope,
+      checker,
+      ownerEntry: scope.get("httpClient")!,
+    });
+
+    expect(result.beanName).toBe("apiUrl");
+    expect(result.diagnostics).toHaveLength(0);
+  });
+
   it("override: takes precedence over an otherwise-unambiguous type match", async () => {
     // Two distinct logger classes, both in scope; constructor declares MainLogger,
     // so type matching would unambiguously pick `mainLogger`. The override

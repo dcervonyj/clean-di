@@ -18,6 +18,13 @@ export interface ContextDeclaration {
   readonly exportName: string;
   /** The `<TConfig>` type reference text, or `"void"` when omitted. */
   readonly configTypeName: string;
+  /**
+   * The resolved `ts.Type` of `TConfig` from the outer `defineContext<TConfig>()`
+   * call, or `undefined` when `TConfig` is `void` / omitted, or when no type
+   * checker was supplied to `collectContexts`. Used by `buildBeanScopeWithImports`
+   * to synthesise per-field config beans (T-046).
+   */
+  readonly configType: ts.Type | undefined;
   /** Beans in source order. */
   readonly beans: readonly BeanDeclaration[];
   /** The exposed keys (from `expose: [...] as const`). */
@@ -51,7 +58,10 @@ export interface CollectContextsResult {
  *   4. `expose` must be present and an array literal of string literals.
  *   5. `imports`, if present, must be an array literal.
  */
-export function collectContexts(parsed: ParsedDiFile): CollectContextsResult {
+export function collectContexts(
+  parsed: ParsedDiFile,
+  checker?: ts.TypeChecker,
+): CollectContextsResult {
   const contexts: ContextDeclaration[] = [];
   const diagnostics: Diagnostic[] = [];
 
@@ -96,6 +106,7 @@ export function collectContexts(parsed: ParsedDiFile): CollectContextsResult {
     contexts.push({
       exportName: extractExportName(innerCall),
       configTypeName: extractConfigTypeName(call.node),
+      configType: checker !== undefined ? extractConfigType(checker, call.node) : undefined,
       beans: extractBeans(spec),
       expose: extractExposeList(spec),
       postConstruct: extractHook(spec, "postConstruct"),
@@ -158,6 +169,27 @@ function extractConfigTypeName(outerCall: ts.CallExpression): string {
   }
 
   return first.getText();
+}
+
+/**
+ * Resolve the `ts.Type` of `TConfig` from the outer `defineContext<TConfig>()`
+ * call's type argument. Returns `undefined` when no type argument is provided
+ * or it is the `void` keyword (= no synthetic config beans, per T-046).
+ */
+function extractConfigType(
+  checker: ts.TypeChecker,
+  outerCall: ts.CallExpression,
+): ts.Type | undefined {
+  const typeArgs = outerCall.typeArguments;
+  if (typeArgs === undefined || typeArgs.length === 0) {
+    return undefined;
+  }
+  const node = typeArgs[0]!;
+  if (node.kind === ts.SyntaxKind.VoidKeyword) {
+    return undefined;
+  }
+
+  return checker.getTypeFromTypeNode(node);
 }
 
 function findProperty(
