@@ -6,6 +6,8 @@
 import { createContext } from "clean-di/runtime";
 import { Logger } from "./Logger";
 import { commentsConfig } from "./commentsConfig";
+import { HttpCommentsRepository } from "./HttpCommentsRepository.js";
+import { ListCommentsUseCase } from "./ListCommentsUseCase.js";
 
 export const blogContext = createContext<void, { listComments: ListCommentsUseCase }>(
   (cfg) => {

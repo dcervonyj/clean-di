@@ -6,6 +6,9 @@
 import { createContext } from "clean-di/runtime";
 import { aConfig } from "./aConfig";
 import { bConfig } from "./bConfig";
+import { Logger } from "./Logger.js";
+import { ServiceA } from "./ServiceA.js";
+import { ServiceB } from "./ServiceB.js";
 
 export const appContext = createContext<void, { serviceA: ServiceA, serviceB: ServiceB }>(
   (cfg) => {

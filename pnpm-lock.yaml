@@ -49,6 +49,19 @@ importers:
         specifier: '>=5.0.0'
         version: 5.9.3
 
+  examples/modular:
+    dependencies:
+      clean-di:
+        specifier: workspace:*
+        version: link:../../packages/clean-di
+    devDependencies:
+      clean-di-codegen:
+        specifier: workspace:*
+        version: link:../../packages/clean-di-codegen
+      typescript:
+        specifier: '>=5.0.0'
+        version: 5.9.3
+
   packages/clean-di:
     devDependencies:
       expect-type:

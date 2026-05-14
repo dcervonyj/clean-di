@@ -12,3 +12,4 @@ export { bean } from "./public/bean.js";
 
 export type { Container } from "./runtime/Container.js";
 export type { BeanDef, ContextSpec, ConfigSpec } from "./public/types.js";
+export type { DefinedConfig } from "./public/defineConfig.js";

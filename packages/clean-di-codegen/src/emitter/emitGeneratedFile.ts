@@ -1,6 +1,6 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { dirname, basename } from "node:path";
+import { dirname, basename, relative } from "node:path";
 
 import ts from "typescript";
 
@@ -180,7 +180,9 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     return { name, rhs: emitBeanRhs(entry, args) };
   });
 
-  const imports = collectImports(parsed.sourceFile);
+  const baseImports = collectImports(parsed.sourceFile);
+  const extraImports = collectMissingBeanImports(localScope, baseImports, outputPath);
+  const imports = [...baseImports, ...extraImports];
   const sourceFileContent = await readFile(sourcePath, "utf8");
   const hash = hashGeneratedFile({
     sourceFileContent,
@@ -340,6 +342,58 @@ function collectImports(sourceFile: ts.SourceFile): readonly EmittedImport[] {
   }
 
   return imports;
+}
+
+/**
+ * Add imports for bean classes that come from imported sub-configs and are not
+ * already re-emitted by `collectImports` (which only mirrors the top-level
+ * source file's imports).
+ *
+ * For each `bean()` entry whose class declaration lives in a different source
+ * file than the `.di.ts`, emit a new `import { ClassName } from "./relative/path.js"`.
+ * Deduplicates by class name so diamond-imported classes only get one import.
+ */
+function collectMissingBeanImports(
+  localScope: ReadonlyMap<string, BeanScopeEntry>,
+  existingImports: readonly EmittedImport[],
+  outputPath: string,
+): readonly EmittedImport[] {
+  // Names already covered by the source file's re-emitted imports.
+  const alreadyImported = new Set<string>();
+  for (const imp of existingImports) {
+    for (const n of imp.named ?? []) {
+      alreadyImported.add(n.alias ?? n.name);
+    }
+    if (imp.defaultName !== undefined) {
+      alreadyImported.add(imp.defaultName);
+    }
+  }
+
+  const outputDir = dirname(outputPath);
+  const extra: EmittedImport[] = [];
+  const seen = new Set<string>();
+
+  for (const entry of localScope.values()) {
+    if (entry.kind !== "bean") continue;
+    if (entry.classDeclaration === undefined) continue;
+
+    const className = entry.classDeclaration.name?.text;
+    if (className === undefined || alreadyImported.has(className) || seen.has(className)) {
+      continue;
+    }
+    seen.add(className);
+
+    const classSourceFile = entry.classDeclaration.getSourceFile().fileName;
+    // Compute relative path from the generated file to the class's source file.
+    // Use .js extension (NodeNext ESM convention).
+    let rel = relative(outputDir, classSourceFile).replace(/\.ts$/, ".js");
+    if (!rel.startsWith(".")) {
+      rel = "./" + rel;
+    }
+    extra.push({ from: rel, named: [{ name: className }] });
+  }
+
+  return extra;
 }
 
 interface LifecycleHooks {
