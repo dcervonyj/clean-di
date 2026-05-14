@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
-    "codegen": "clean-di-codegen"
+    "codegen": "clean-di-codegen",
+    "check:codegen": "clean-di-codegen --check"
   },
   "dependencies": {
     "clean-di": "workspace:*"

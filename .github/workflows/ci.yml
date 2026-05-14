@@ -37,4 +37,7 @@ jobs:
       - run: pnpm build
 
       - name: Check generated files are up to date
-        run: pnpm --filter clean-di-codegen check:examples
+        run: pnpm --filter './examples/*' check:codegen
+
+      - name: Build examples
+        run: pnpm --filter './examples/*' build
