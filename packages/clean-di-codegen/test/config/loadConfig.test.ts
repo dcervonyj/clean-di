@@ -75,14 +75,8 @@ describe("loadConfig()", () => {
 
   it("prefers .ts > .js > .mjs > package.json", async () => {
     // create all three; .ts should win
-    await writeFile(
-      join(workDir, "clean-di.config.ts"),
-      `export default { tsconfig: "from-ts" };`,
-    );
-    await writeFile(
-      join(workDir, "clean-di.config.js"),
-      `export default { tsconfig: "from-js" };`,
-    );
+    await writeFile(join(workDir, "clean-di.config.ts"), `export default { tsconfig: "from-ts" };`);
+    await writeFile(join(workDir, "clean-di.config.js"), `export default { tsconfig: "from-js" };`);
     await writeFile(
       join(workDir, "package.json"),
       JSON.stringify({ name: "x", cleanDi: { tsconfig: "from-pkg" } }),

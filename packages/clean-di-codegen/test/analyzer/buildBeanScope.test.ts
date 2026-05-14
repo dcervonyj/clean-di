@@ -9,7 +9,9 @@ import { buildBeanScope } from "../../src/analyzer/buildBeanScope";
 import { collectContexts } from "../../src/analyzer/collectContexts";
 import { parseDiFile } from "../../src/analyzer/parseDiFile";
 
-async function buildFixture(diSource: string): Promise<{ program: ts.Program; filePath: string; cleanup: () => Promise<void> }> {
+async function buildFixture(
+  diSource: string,
+): Promise<{ program: ts.Program; filePath: string; cleanup: () => Promise<void> }> {
   const root = join(tmpdir(), `clean-di-scope-test-${Date.now()}-${Math.random()}`);
   const cleanDiDir = join(root, "node_modules", "clean-di", "src", "public");
   await mkdir(cleanDiDir, { recursive: true });

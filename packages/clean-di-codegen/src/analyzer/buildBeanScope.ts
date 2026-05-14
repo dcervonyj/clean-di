@@ -64,10 +64,11 @@ function buildEntry(
     };
   }
 
-  // provide(...)
-  const factoryArg = call.arguments[0];
-  const provideType =
-    factoryArg !== undefined ? extractProvideReturnType(checker, factoryArg) : undefined;
+  // provide(...) — use the return type of the call itself (which respects the
+  // generic on `provide<T>`), NOT the inferred return type of the lambda body.
+  // For `provide<string>((cfg) => cfg.x)`, the call returns `string` even
+  // though the lambda body's type is `any` (cfg is `any`).
+  const provideType = checker.getTypeAtLocation(call);
 
   return {
     name,

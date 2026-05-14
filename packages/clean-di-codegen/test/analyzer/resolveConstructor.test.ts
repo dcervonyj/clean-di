@@ -10,7 +10,9 @@ import { collectContexts } from "../../src/analyzer/collectContexts";
 import { parseDiFile } from "../../src/analyzer/parseDiFile";
 import { resolveConstructor } from "../../src/analyzer/resolveConstructor";
 
-async function buildFixture(diSource: string): Promise<{ program: ts.Program; filePath: string; cleanup: () => Promise<void> }> {
+async function buildFixture(
+  diSource: string,
+): Promise<{ program: ts.Program; filePath: string; cleanup: () => Promise<void> }> {
   const root = join(tmpdir(), `clean-di-resolvector-test-${Date.now()}-${Math.random()}`);
   const cleanDiDir = join(root, "node_modules", "clean-di", "src", "public");
   await mkdir(cleanDiDir, { recursive: true });

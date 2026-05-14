@@ -25,11 +25,7 @@ import {
  * `exclude` arrays concatenate rather than replace.
  */
 export async function loadConfig(cwd: string = process.cwd()): Promise<ResolvedCleanDiConfig> {
-  const candidates = [
-    "clean-di.config.ts",
-    "clean-di.config.js",
-    "clean-di.config.mjs",
-  ];
+  const candidates = ["clean-di.config.ts", "clean-di.config.js", "clean-di.config.mjs"];
 
   for (const filename of candidates) {
     const filepath = pathJoin(cwd, filename);
@@ -69,9 +65,7 @@ async function loadConfigFile(filepath: string): Promise<CleanDiConfig> {
   return mod;
 }
 
-function isModuleWithDefault(
-  m: unknown,
-): m is { default?: CleanDiConfig } {
+function isModuleWithDefault(m: unknown): m is { default?: CleanDiConfig } {
   return typeof m === "object" && m !== null && "default" in m;
 }
 

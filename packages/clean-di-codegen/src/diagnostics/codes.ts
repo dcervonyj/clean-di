@@ -52,14 +52,17 @@ export interface Diagnostic {
  */
 export const DEFAULT_MESSAGES: Readonly<Record<DiagnosticCode, string>> = {
   "CDI-001": "UnresolvableDependency: no bean in scope matches the constructor parameter.",
-  "CDI-002": "AmbiguousDependency: multiple beans of the same type match the constructor parameter.",
+  "CDI-002":
+    "AmbiguousDependency: multiple beans of the same type match the constructor parameter.",
   "CDI-003": "CyclicDependency: bean construction graph contains a cycle.",
   "CDI-004": "MissingExposeTarget: the bean named in `expose` does not exist in scope.",
   "CDI-005": "InvalidContextShape: `defineContext` call is malformed.",
   "CDI-006": "DuplicateBean: the same bean name appears in `beans` and an imported config.",
   "CDI-007": "InvalidBeanDef: bean entry is neither `bean(...)` nor `provide(...)`.",
-  "CDI-008": "UnsupportedConstructor: spread, destructured, or private/protected constructors are not supported.",
-  "CDI-009": "ConfigTypeNotFound: the `defineContext<TConfig>()` type parameter could not be resolved.",
+  "CDI-008":
+    "UnsupportedConstructor: spread, destructured, or private/protected constructors are not supported.",
+  "CDI-009":
+    "ConfigTypeNotFound: the `defineContext<TConfig>()` type parameter could not be resolved.",
   "CDI-010": "InvalidImport: `imports` entry is not a `defineConfig(...)` result.",
   "CDIE-101": "Container.get() called for a key after destroy().",
   "CDIE-102": "Container.destroy() called for an unknown key (warning, not fatal).",
@@ -72,7 +75,8 @@ export const DEFAULT_MESSAGES: Readonly<Record<DiagnosticCode, string>> = {
  * context-specific suggestion).
  */
 export const DEFAULT_HINTS: Readonly<Record<DiagnosticCode, string>> = {
-  "CDI-001": "Declare the missing dependency with `bean(...)` or `provide(...)`, or pull it in via `imports`.",
+  "CDI-001":
+    "Declare the missing dependency with `bean(...)` or `provide(...)`, or pull it in via `imports`.",
   "CDI-002": "Add a `bean(Class, { paramName: 'beanName' })` override to disambiguate.",
   "CDI-003": "Refactor to break the cycle — extract the shared state into a third bean.",
   "CDI-004": "Add the bean to the context's `beans` map or correct the name in `expose`.",

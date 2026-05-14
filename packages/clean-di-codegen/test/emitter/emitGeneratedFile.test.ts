@@ -14,12 +14,26 @@ async function stubCleanDi(root: string): Promise<void> {
   const cleanDiDir = join(root, "node_modules", "clean-di", "src", "public");
   await mkdir(cleanDiDir, { recursive: true });
 
-  for (const fn of ["defineContext", "defineConfig", "bean", "provide"]) {
-    await writeFile(
-      join(cleanDiDir, `${fn}.ts`),
-      `export function ${fn}(...args: any[]): any { return args; }`,
-    );
-  }
+  // Type-preserving stubs so the type checker sees realistic types during
+  // analysis. In particular, `provide<T>(factory): T` preserves the return
+  // type — without this, `provide((cfg) => cfg.x)` would yield `any`, which
+  // is assignable to every parameter and breaks ambiguity tracking.
+  await writeFile(
+    join(cleanDiDir, "defineContext.ts"),
+    `export function defineContext<TConfig = void>(): (spec: any) => any { return () => undefined as any; }`,
+  );
+  await writeFile(
+    join(cleanDiDir, "defineConfig.ts"),
+    `export function defineConfig<T>(spec: T): T { return spec; }`,
+  );
+  await writeFile(
+    join(cleanDiDir, "bean.ts"),
+    `export function bean<C extends new (...args: any[]) => any>(Class: C, overrides?: any): InstanceType<C> { return undefined as any; }`,
+  );
+  await writeFile(
+    join(cleanDiDir, "provide.ts"),
+    `export function provide<T>(factory: (cfg: any) => T): T { return undefined as any; }`,
+  );
   await writeFile(
     join(cleanDiDir, "index.ts"),
     [
@@ -92,6 +106,11 @@ describe("emitGeneratedFile() — MVP integration", () => {
       reporter,
       generatorVersion: "1.0.0",
     });
+
+    if (!result.wrote) {
+      // eslint-disable-next-line no-console
+      console.error("DEBUG diagnostics:", JSON.stringify(result.diagnostics, null, 2));
+    }
 
     expect(result.wrote).toBe(true);
     expect(result.diagnostics).toHaveLength(0);

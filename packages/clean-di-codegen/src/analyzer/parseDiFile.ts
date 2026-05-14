@@ -59,9 +59,8 @@ function classifyCall(checker: ts.TypeChecker, call: ts.CallExpression): DiCallK
   }
 
   // Follow aliases (e.g., `import { bean as b }`).
-  const target = (symbol.flags & ts.SymbolFlags.Alias) !== 0
-    ? checker.getAliasedSymbol(symbol)
-    : symbol;
+  const target =
+    (symbol.flags & ts.SymbolFlags.Alias) !== 0 ? checker.getAliasedSymbol(symbol) : symbol;
 
   const decl = target.valueDeclaration ?? target.declarations?.[0];
   if (decl === undefined) {
@@ -71,24 +70,16 @@ function classifyCall(checker: ts.TypeChecker, call: ts.CallExpression): DiCallK
   const declFile = decl.getSourceFile().fileName;
   // Match files inside the clean-di package's public DSL surface.
   // Accept both source (during monorepo dev) and dist (when installed).
-  if (
-    /clean-di\/(src|dist)\/public\/defineContext\.(ts|d\.ts|js)$/.test(declFile)
-  ) {
+  if (/clean-di\/(src|dist)\/public\/defineContext\.(ts|d\.ts|js)$/.test(declFile)) {
     return "defineContext";
   }
-  if (
-    /clean-di\/(src|dist)\/public\/defineConfig\.(ts|d\.ts|js)$/.test(declFile)
-  ) {
+  if (/clean-di\/(src|dist)\/public\/defineConfig\.(ts|d\.ts|js)$/.test(declFile)) {
     return "defineConfig";
   }
-  if (
-    /clean-di\/(src|dist)\/public\/bean\.(ts|d\.ts|js)$/.test(declFile)
-  ) {
+  if (/clean-di\/(src|dist)\/public\/bean\.(ts|d\.ts|js)$/.test(declFile)) {
     return "bean";
   }
-  if (
-    /clean-di\/(src|dist)\/public\/provide\.(ts|d\.ts|js)$/.test(declFile)
-  ) {
+  if (/clean-di\/(src|dist)\/public\/provide\.(ts|d\.ts|js)$/.test(declFile)) {
     return "provide";
   }
 

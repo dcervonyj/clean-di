@@ -10,7 +10,7 @@ export interface PostsContextConfig {
 
 export const postsContext = defineContext<PostsContextConfig>()({
   beans: {
-    apiBaseUrl: provide((cfg) => cfg.apiBaseUrl),
+    apiBaseUrl: provide<string>((cfg) => cfg.apiBaseUrl),
     logger: bean(Logger),
     postsRepository: bean(HttpPostsRepository),
     listPosts: bean(ListPostsUseCase),

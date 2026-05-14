@@ -13,11 +13,7 @@ import { collectContexts } from "../analyzer/collectContexts.js";
 import { buildBeanScope, type BeanScopeEntry } from "../analyzer/buildBeanScope.js";
 import { resolveConstructor } from "../analyzer/resolveConstructor.js";
 import { topoSort } from "../analyzer/topoSort.js";
-import {
-  formatGenerated,
-  type EmittedBean,
-  type EmittedImport,
-} from "./formatGenerated.js";
+import { formatGenerated, type EmittedBean, type EmittedImport } from "./formatGenerated.js";
 import { hashGeneratedFile } from "./hash.js";
 
 export interface EmitInput {
@@ -100,7 +96,10 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
   const graph = new Map<string, readonly string[]>();
   for (const [name, args] of resolvedArgs) {
     // Filter out null (optional-skipped) when building the dep graph.
-    graph.set(name, args.filter((a): a is string => a !== null));
+    graph.set(
+      name,
+      args.filter((a): a is string => a !== null),
+    );
   }
 
   const positions = new Map<string, { file: string; line: number; column: number }>();
@@ -256,10 +255,11 @@ function collectImports(sourceFile: ts.SourceFile): readonly EmittedImport[] {
         const name =
           element.propertyName !== undefined ? element.propertyName.text : element.name.text;
         const alias = element.propertyName !== undefined ? element.name.text : undefined;
+        const typeOnly = isTypeOnlyImport || element.isTypeOnly;
         named.push({
           name,
-          alias,
-          typeOnly: isTypeOnlyImport || element.isTypeOnly,
+          ...(alias !== undefined ? { alias } : {}),
+          ...(typeOnly ? { typeOnly: true } : {}),
         });
       }
     }
@@ -268,7 +268,7 @@ function collectImports(sourceFile: ts.SourceFile): readonly EmittedImport[] {
 
     imports.push({
       from: moduleSpecifier.text,
-      defaultName,
+      ...(defaultName !== undefined ? { defaultName } : {}),
       named,
     });
   }

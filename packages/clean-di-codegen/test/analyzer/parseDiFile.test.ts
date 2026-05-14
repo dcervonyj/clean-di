@@ -11,7 +11,9 @@ import { parseDiFile } from "../../src/analyzer/parseDiFile";
  * Build a TS Program that includes a single fixture .di.ts file plus a
  * stub `clean-di` package (so symbol resolution succeeds without a real install).
  */
-async function buildFixture(diSource: string): Promise<{ program: ts.Program; filePath: string; cleanup: () => Promise<void> }> {
+async function buildFixture(
+  diSource: string,
+): Promise<{ program: ts.Program; filePath: string; cleanup: () => Promise<void> }> {
   const root = join(tmpdir(), `clean-di-parse-test-${Date.now()}-${Math.random()}`);
   const cleanDiDir = join(root, "node_modules", "clean-di", "src", "public");
   await mkdir(cleanDiDir, { recursive: true });
@@ -37,7 +39,11 @@ async function buildFixture(diSource: string): Promise<{ program: ts.Program; fi
   // Package.json + barrel index re-exports for resolution.
   await writeFile(
     join(root, "node_modules", "clean-di", "package.json"),
-    JSON.stringify({ name: "clean-di", main: "./src/public/index.ts", types: "./src/public/index.ts" }),
+    JSON.stringify({
+      name: "clean-di",
+      main: "./src/public/index.ts",
+      types: "./src/public/index.ts",
+    }),
   );
   await writeFile(
     join(cleanDiDir, "index.ts"),

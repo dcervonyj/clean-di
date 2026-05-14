@@ -8,7 +8,10 @@ export interface TopoSortInput {
    * Used when emitting CDI-003 so the cycle diagnostic points back to a real
    * line in the .di.ts file. Falls back to "unknown" when absent.
    */
-  readonly positions?: ReadonlyMap<string, { readonly file: string; readonly line: number; readonly column: number }>;
+  readonly positions?: ReadonlyMap<
+    string,
+    { readonly file: string; readonly line: number; readonly column: number }
+  >;
 }
 
 export interface TopoSortResult {
@@ -26,7 +29,7 @@ export interface TopoSortResult {
 export function topoSort(input: TopoSortInput): TopoSortResult {
   const { graph, positions } = input;
   const WHITE = 0; // unvisited
-  const GREY = 1;  // in the current DFS path
+  const GREY = 1; // in the current DFS path
   const BLACK = 2; // fully processed
 
   const color = new Map<string, number>();
