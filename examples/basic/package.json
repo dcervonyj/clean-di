@@ -1,6 +1,6 @@
 {
   "name": "clean-di-example-basic",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,7 +19,11 @@
     "typescript": ">=5.0.0"
   },
   "cleanDi": {
-    "include": ["src/**/*.di.ts"],
-    "exclude": ["**/node_modules/**"]
+    "include": [
+      "src/**/*.di.ts"
+    ],
+    "exclude": [
+      "**/node_modules/**"
+    ]
   }
 }
