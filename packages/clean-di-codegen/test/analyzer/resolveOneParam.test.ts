@@ -249,7 +249,7 @@ describe("resolveOneParam() — MVP, type matching only", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const checker = program.getTypeChecker();
     const scope = buildBeanScope(checker, ctx);
     const ownerEntry = scope.get("useCase")!;
@@ -280,7 +280,7 @@ describe("resolveOneParam() — MVP, type matching only", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const checker = program.getTypeChecker();
     const scope = buildBeanScope(checker, ctx);
     const ownerEntry = scope.get("useCase")!;
@@ -316,7 +316,7 @@ describe("resolveOneParam() — MVP, type matching only", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const checker = program.getTypeChecker();
     const scope = buildBeanScope(checker, ctx);
     const ownerEntry = scope.get("useCase")!;
@@ -357,7 +357,7 @@ describe("resolveOneParam() — MVP, type matching only", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const checker = program.getTypeChecker();
     const scope = buildBeanScope(checker, ctx);
     const ownerEntry = scope.get("useCase")!;

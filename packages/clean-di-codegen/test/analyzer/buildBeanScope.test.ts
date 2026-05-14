@@ -5,10 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import ts from "typescript";
 
-import {
-  buildBeanScope,
-  buildBeanScopeWithImports,
-} from "../../src/analyzer/buildBeanScope";
+import { buildBeanScope, buildBeanScopeWithImports } from "../../src/analyzer/buildBeanScope";
 import { collectContexts } from "../../src/analyzer/collectContexts";
 import { parseDiFile } from "../../src/analyzer/parseDiFile";
 
@@ -227,7 +224,7 @@ describe("buildBeanScopeWithImports() — imports resolution (CDI-006, CDI-010)"
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed).find((c) => c.exportName === "ctx")!;
+    const ctx = collectContexts(parsed).contexts.find((c) => c.exportName === "ctx")!;
     const { scope, diagnostics } = buildBeanScopeWithImports(program.getTypeChecker(), ctx);
 
     expect(diagnostics).toEqual([]);
@@ -258,7 +255,7 @@ describe("buildBeanScopeWithImports() — imports resolution (CDI-006, CDI-010)"
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed).find((c) => c.exportName === "ctx")!;
+    const ctx = collectContexts(parsed).contexts.find((c) => c.exportName === "ctx")!;
     const { scope, diagnostics } = buildBeanScopeWithImports(program.getTypeChecker(), ctx);
 
     expect(diagnostics).toEqual([]);
@@ -294,7 +291,7 @@ describe("buildBeanScopeWithImports() — imports resolution (CDI-006, CDI-010)"
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed).find((c) => c.exportName === "ctx")!;
+    const ctx = collectContexts(parsed).contexts.find((c) => c.exportName === "ctx")!;
     const { scope, diagnostics } = buildBeanScopeWithImports(program.getTypeChecker(), ctx);
 
     expect(diagnostics).toEqual([]);
@@ -321,7 +318,7 @@ describe("buildBeanScopeWithImports() — imports resolution (CDI-006, CDI-010)"
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed).find((c) => c.exportName === "ctx")!;
+    const ctx = collectContexts(parsed).contexts.find((c) => c.exportName === "ctx")!;
     const { diagnostics } = buildBeanScopeWithImports(program.getTypeChecker(), ctx);
 
     expect(diagnostics).toHaveLength(1);
@@ -342,7 +339,7 @@ describe("buildBeanScopeWithImports() — imports resolution (CDI-006, CDI-010)"
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed).find((c) => c.exportName === "ctx")!;
+    const ctx = collectContexts(parsed).contexts.find((c) => c.exportName === "ctx")!;
     const { diagnostics } = buildBeanScopeWithImports(program.getTypeChecker(), ctx);
 
     expect(diagnostics).toHaveLength(1);

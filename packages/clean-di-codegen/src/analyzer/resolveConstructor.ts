@@ -13,7 +13,7 @@ export interface ResolveConstructorInput {
    * map for `resolveOneParam`. Optional for backward compatibility with W3
    * callers; when absent, parameters resolve by type matching only.
    */
-  readonly ownerEntry?: BeanScopeEntry;
+  readonly ownerEntry: BeanScopeEntry | undefined;
 }
 
 export interface ResolveConstructorResult {

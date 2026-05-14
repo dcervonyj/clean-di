@@ -15,7 +15,7 @@ export interface ResolveParamInput {
    * map (the W4 escape hatch). Optional — when absent, resolution falls back
    * to the W3 type-matching behavior only.
    */
-  readonly ownerEntry?: BeanScopeEntry;
+  readonly ownerEntry: BeanScopeEntry | undefined;
 }
 
 export interface ResolveParamResult {
