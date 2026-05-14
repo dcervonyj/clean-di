@@ -9,6 +9,7 @@ import { DiagnosticReporter } from "../../src/diagnostics/report";
 import { emitGeneratedFile } from "../../src/emitter/emitGeneratedFile";
 
 const FIXTURES = join(__dirname, "..", "fixtures", "unambiguous");
+const LIFECYCLE_FIXTURES = join(__dirname, "..", "fixtures", "lifecycle");
 
 async function stubCleanDi(root: string): Promise<void> {
   const cleanDiDir = join(root, "node_modules", "clean-di", "src", "public");
@@ -200,6 +201,53 @@ describe("emitGeneratedFile() — MVP integration", () => {
     });
     expect(second.wrote).toBe(false);
     expect(second.diagnostics).toHaveLength(0);
+  });
+
+  it("emits postConstruct and preDestroy hooks when present in the spec", async () => {
+    // Copy the lifecycle fixture into the workDir alongside the unambiguous
+    // files already there. The codegen will write the generated file adjacent
+    // to `input.di.ts`, so we overwrite `input.di.ts` with the lifecycle one.
+    for (const file of ["input.di.ts", "Logger.ts", "Greeter.ts"]) {
+      await copyFile(join(LIFECYCLE_FIXTURES, file), join(workDir, file));
+    }
+
+    const sourcePath = join(workDir, "input.di.ts");
+    const program = ts.createProgram({
+      rootNames: [sourcePath],
+      options: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.NodeNext,
+        moduleResolution: ts.ModuleResolutionKind.NodeNext,
+        strict: false,
+        noEmit: true,
+        skipLibCheck: true,
+        esModuleInterop: true,
+        baseUrl: workDir,
+      },
+    });
+
+    const reporter = new DiagnosticReporter(() => {}, false);
+    const result = await emitGeneratedFile({
+      sourcePath,
+      program,
+      reporter,
+      generatorVersion: "1.0.0",
+    });
+
+    expect(result.wrote).toBe(true);
+    expect(result.diagnostics).toHaveLength(0);
+
+    const generated = await readFile(result.outputPath, "utf8");
+
+    // Adapter pattern: user's hook `(beans, cfg) => ...` is wrapped in a
+    // `(cfg) => ...` lambda that supplies the locally-built bean bag.
+    expect(generated).toContain("postConstruct: (cfg) => (");
+    expect(generated).toContain("preDestroy: (cfg) => (");
+    // The user's hook source is emitted verbatim inside the adapter.
+    expect(generated).toContain("greeter.init()");
+    expect(generated).toContain("greeter.dispose()");
+    // The adapter passes the bag (`{ logger, greeter }`) and `cfg` to the user's hook.
+    expect(generated).toContain("({ logger, greeter }, cfg)");
   });
 
   it("re-emits when the generator version changes (hash mismatch)", async () => {

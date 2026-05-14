@@ -1,0 +1,18 @@
+import { defineContext, bean } from "clean-di";
+
+import { Logger } from "./Logger";
+import { Greeter } from "./Greeter";
+
+export const greeterContext = defineContext()({
+  beans: {
+    logger: bean(Logger),
+    greeter: bean(Greeter),
+  },
+  postConstruct: ({ greeter }) => {
+    greeter.init();
+  },
+  preDestroy: ({ greeter }) => {
+    greeter.dispose();
+  },
+  expose: ["greeter"] as const,
+});

@@ -61,6 +61,10 @@ export interface FormatGeneratedInput {
   readonly exposedKeys: readonly string[];
   /** Header template (defaults to `DEFAULT_HEADER` from `config/defaultConfig.ts`). */
   readonly headerTemplate: string;
+  /** Source text of the `postConstruct` arrow / function expression, or undefined. */
+  readonly postConstructSource?: string;
+  /** Source text of the `preDestroy` arrow / function expression, or undefined. */
+  readonly preDestroySource?: string;
 }
 
 /**
@@ -79,6 +83,7 @@ export function formatGenerated(input: FormatGeneratedInput): string {
   const beanLines = input.beansInTopoOrder.map((b) => `    const ${b.name} = ${b.rhs};`);
   const bagFields = input.beansInTopoOrder.map((b) => b.name).join(", ");
   const exposeFields = input.exposedKeys.join(", ");
+  const hookLines = renderHookLines(input, bagFields);
 
   return [
     header,
@@ -92,6 +97,7 @@ export function formatGenerated(input: FormatGeneratedInput): string {
     `    return {`,
     `      bag: { ${bagFields} },`,
     `      expose: { ${exposeFields} },`,
+    ...hookLines,
     `    };`,
     `  },`,
     `);`,
@@ -124,6 +130,30 @@ function renderImport(imp: EmittedImport): string {
   }
 
   return `import ${parts.join(", ")} from "${imp.from}";`;
+}
+
+/**
+ * Render the optional `postConstruct` / `preDestroy` fields for the BuildResult
+ * literal. The user's hook is authored as `(beans, cfg) => ...`, but the
+ * `BuildResult` shape expects `(config: unknown) => void`. We wrap the user's
+ * hook in a thin adapter that supplies the locally-built bean bag.
+ */
+function renderHookLines(input: FormatGeneratedInput, bagFields: string): readonly string[] {
+  const lines: string[] = [];
+
+  if (input.postConstructSource !== undefined) {
+    lines.push(
+      `      postConstruct: (cfg) => (${input.postConstructSource})({ ${bagFields} }, cfg),`,
+    );
+  }
+
+  if (input.preDestroySource !== undefined) {
+    lines.push(
+      `      preDestroy: (cfg) => (${input.preDestroySource})({ ${bagFields} }, cfg),`,
+    );
+  }
+
+  return lines;
 }
 
 function renderExposedTypeAnnotation(input: FormatGeneratedInput): string {
