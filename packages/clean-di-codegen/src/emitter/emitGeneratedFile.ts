@@ -91,6 +91,7 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
       classDeclaration: entry.classDeclaration,
       scope: localScope,
       checker,
+      ownerEntry: entry,
     });
 
     allDiagnostics.push(...result.diagnostics);

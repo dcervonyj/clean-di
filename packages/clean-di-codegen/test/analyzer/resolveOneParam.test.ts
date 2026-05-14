@@ -227,4 +227,146 @@ describe("resolveOneParam() — MVP, type matching only", () => {
     expect(result.skippedAsOptional).toBe(true);
     expect(result.diagnostics).toHaveLength(0);
   });
+
+  it("override: uses the named bean when override exists and types match", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       export class MainLogger { private readonly tag = "main"; log(): void {} }
+       export class BackupLogger { private readonly tag = "backup"; log(): void {} }
+       export class UseCase {
+         private readonly tag = "uc";
+         constructor(public logger: MainLogger) {}
+       }
+       export const ctx = defineContext()({
+         beans: {
+           mainLogger: bean(MainLogger),
+           backupLogger: bean(BackupLogger),
+           useCase: bean(UseCase, { logger: "mainLogger" }),
+         },
+         expose: ["useCase"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed)[0]!;
+    const checker = program.getTypeChecker();
+    const scope = buildBeanScope(checker, ctx);
+    const ownerEntry = scope.get("useCase")!;
+
+    const params = getConstructorParams(parsed.sourceFile, "UseCase");
+    const result = resolveOneParam({ param: params[0]!, scope, checker, ownerEntry });
+
+    expect(result.beanName).toBe("mainLogger");
+    expect(result.diagnostics).toHaveLength(0);
+  });
+
+  it("override: emits CDI-001 when the override target does not exist in scope", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       export class MainLogger { private readonly tag = "main"; log(): void {} }
+       export class UseCase {
+         private readonly tag = "uc";
+         constructor(public logger: MainLogger) {}
+       }
+       export const ctx = defineContext()({
+         beans: {
+           mainLogger: bean(MainLogger),
+           useCase: bean(UseCase, { logger: "nonExistentLogger" }),
+         },
+         expose: ["useCase"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed)[0]!;
+    const checker = program.getTypeChecker();
+    const scope = buildBeanScope(checker, ctx);
+    const ownerEntry = scope.get("useCase")!;
+
+    const params = getConstructorParams(parsed.sourceFile, "UseCase");
+    const result = resolveOneParam({ param: params[0]!, scope, checker, ownerEntry });
+
+    expect(result.beanName).toBeNull();
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-001");
+    expect(result.diagnostics[0]!.message).toMatch(/nonExistentLogger/);
+    expect(result.diagnostics[0]!.message).toMatch(/does not exist in scope/);
+  });
+
+  it("override: emits CDI-001 when the override target's type is not assignable to the param", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       export class MainLogger { private readonly tag = "main"; log(): void {} }
+       export class Database { private readonly url = ""; query(): void {} }
+       export class UseCase {
+         private readonly tag = "uc";
+         constructor(public logger: MainLogger) {}
+       }
+       export const ctx = defineContext()({
+         beans: {
+           mainLogger: bean(MainLogger),
+           database: bean(Database),
+           useCase: bean(UseCase, { logger: "database" }),
+         },
+         expose: ["useCase"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed)[0]!;
+    const checker = program.getTypeChecker();
+    const scope = buildBeanScope(checker, ctx);
+    const ownerEntry = scope.get("useCase")!;
+
+    const params = getConstructorParams(parsed.sourceFile, "UseCase");
+    const result = resolveOneParam({ param: params[0]!, scope, checker, ownerEntry });
+
+    expect(result.beanName).toBeNull();
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-001");
+    expect(result.diagnostics[0]!.message).toMatch(/database/);
+    expect(result.diagnostics[0]!.message).toMatch(/not assignable/);
+  });
+
+  it("override: takes precedence over an otherwise-unambiguous type match", async () => {
+    // Two distinct logger classes, both in scope; constructor declares MainLogger,
+    // so type matching would unambiguously pick `mainLogger`. The override
+    // explicitly points to `backupLogger` — but BackupLogger isn't assignable
+    // to MainLogger, so the override should emit CDI-001 rather than silently
+    // falling back to the type-match.
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       export class MainLogger { private readonly tag = "main"; log(): void {} }
+       export class BackupLogger { private readonly tag = "backup"; log(): void {} }
+       export class UseCase {
+         private readonly tag = "uc";
+         constructor(public logger: MainLogger) {}
+       }
+       export const ctx = defineContext()({
+         beans: {
+           mainLogger: bean(MainLogger),
+           backupLogger: bean(BackupLogger),
+           useCase: bean(UseCase, { logger: "backupLogger" }),
+         },
+         expose: ["useCase"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed)[0]!;
+    const checker = program.getTypeChecker();
+    const scope = buildBeanScope(checker, ctx);
+    const ownerEntry = scope.get("useCase")!;
+
+    const params = getConstructorParams(parsed.sourceFile, "UseCase");
+    const result = resolveOneParam({ param: params[0]!, scope, checker, ownerEntry });
+
+    expect(result.beanName).toBeNull();
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-001");
+  });
 });
