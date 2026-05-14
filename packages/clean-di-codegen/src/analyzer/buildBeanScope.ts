@@ -8,11 +8,11 @@ export interface BeanScopeEntry {
   /** Whether the bean was declared via `bean(...)` or `provide(...)`. */
   readonly kind: "bean" | "provide";
   /** The class declaration referenced by `bean(Class)`, if resolvable. */
-  readonly classDeclaration?: ts.ClassDeclaration;
+  readonly classDeclaration: ts.ClassDeclaration | undefined;
   /** The class symbol, useful for type comparisons later. */
-  readonly classSymbol?: ts.Symbol;
+  readonly classSymbol: ts.Symbol | undefined;
   /** For `provide(...)`, the result type of the factory expression. */
-  readonly provideType?: ts.Type;
+  readonly provideType: ts.Type | undefined;
   /** `bean(Class, overrides)` second argument, if present. Keys = param names. */
   readonly overrides: Readonly<Record<string, string>>;
   /** Original AST node (the `bean()` or `provide()` call) — for diagnostics positions. */
@@ -28,10 +28,7 @@ export type BeanScope = ReadonlyMap<string, BeanScopeEntry>;
  *
  * The returned map preserves declaration order via JS Map iteration semantics.
  */
-export function buildBeanScope(
-  checker: ts.TypeChecker,
-  context: ContextDeclaration,
-): BeanScope {
+export function buildBeanScope(checker: ts.TypeChecker, context: ContextDeclaration): BeanScope {
   const scope = new Map<string, BeanScopeEntry>();
 
   for (const beanDecl of context.beans) {
@@ -61,6 +58,7 @@ function buildEntry(
       kind: "bean",
       classDeclaration,
       classSymbol,
+      provideType: undefined,
       overrides,
       source: call,
     };
@@ -68,11 +66,14 @@ function buildEntry(
 
   // provide(...)
   const factoryArg = call.arguments[0];
-  const provideType = factoryArg !== undefined ? extractProvideReturnType(checker, factoryArg) : undefined;
+  const provideType =
+    factoryArg !== undefined ? extractProvideReturnType(checker, factoryArg) : undefined;
 
   return {
     name,
     kind: "provide",
+    classDeclaration: undefined,
+    classSymbol: undefined,
     provideType,
     overrides: {},
     source: call,
@@ -92,9 +93,8 @@ function resolveClassReference(
     return { classDeclaration: undefined, classSymbol: undefined };
   }
 
-  const target = (symbol.flags & ts.SymbolFlags.Alias) !== 0
-    ? checker.getAliasedSymbol(symbol)
-    : symbol;
+  const target =
+    (symbol.flags & ts.SymbolFlags.Alias) !== 0 ? checker.getAliasedSymbol(symbol) : symbol;
 
   const decl = target.valueDeclaration ?? target.declarations?.[0];
   if (decl !== undefined && ts.isClassDeclaration(decl)) {
@@ -130,10 +130,7 @@ function extractProvideReturnType(
   factoryArg: ts.Expression,
 ): ts.Type | undefined {
   // factoryArg is the lambda passed to provide(). We want its return type.
-  if (
-    ts.isArrowFunction(factoryArg) ||
-    ts.isFunctionExpression(factoryArg)
-  ) {
+  if (ts.isArrowFunction(factoryArg) || ts.isFunctionExpression(factoryArg)) {
     const signature = checker.getSignatureFromDeclaration(factoryArg);
     if (signature !== undefined) {
       return checker.getReturnTypeOfSignature(signature);
