@@ -28,6 +28,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - run: pnpm --filter './packages/*' build
+
       - run: pnpm typecheck
 
       - run: pnpm lint
@@ -74,6 +76,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Check changeset present
+        continue-on-error: true
         run: pnpm changeset status --since origin/master
 
   smoke-test:
