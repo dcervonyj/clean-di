@@ -35,11 +35,17 @@ export interface ResolveParamResult {
  *     bean wins outright. If it doesn't exist in scope or its type doesn't
  *     match the parameter type, emit `CDI-001` with a hint pointing at the
  *     override (the user explicitly asked for it — don't silently fall back).
- *  2. **Type matching** — filter the scope by `isTypeAssignableTo` and pick
- *     the unique match. Zero matches on a required param → `CDI-001`. Zero
- *     matches on an optional param → silently skip. Multiple matches → `CDI-002`.
+ *  2. **Type matching** — filter the scope by `isTypeAssignableTo`.
+ *  3. **Exactly one type match** → use it.
+ *  4. **Zero type matches** → name fallback: a bean whose key equals the
+ *     parameter name verbatim AND whose type is assignable. Otherwise →
+ *     `CDI-001` (or silent skip if the param is optional).
+ *  5. **Multiple type matches** → name fallback among the candidates: a
+ *     candidate whose key equals the parameter name verbatim. Otherwise →
+ *     `CDI-002`.
  *
- * Name fallback (W4 — T-044) extends this in place.
+ * Name fallback is byte-for-byte case-sensitive — no camelCase / kebab-case
+ * normalization (DESIGN §7.5).
  */
 export function resolveOneParam(input: ResolveParamInput): ResolveParamResult {
   const { param, scope, checker, ownerEntry } = input;
@@ -76,6 +82,19 @@ export function resolveOneParam(input: ResolveParamInput): ResolveParamResult {
   }
 
   if (matches.length === 0) {
+    // Step 3d — name fallback: look for a bean named exactly like the param,
+    // whose type is assignable to the parameter type.
+    const fallbackEntry = scope.get(paramName);
+    if (fallbackEntry !== undefined) {
+      const fallbackType = getBeanType(checker, fallbackEntry);
+      if (
+        fallbackType !== undefined &&
+        checker.isTypeAssignableTo(fallbackType, paramType)
+      ) {
+        return { beanName: paramName, skippedAsOptional: false, diagnostics: [] };
+      }
+    }
+
     if (isOptional) {
       return { beanName: null, skippedAsOptional: true, diagnostics: [] };
     }
@@ -97,7 +116,12 @@ export function resolveOneParam(input: ResolveParamInput): ResolveParamResult {
     };
   }
 
-  // matches.length > 1 — ambiguous
+  // matches.length > 1 — try name fallback among the candidates (step 3e).
+  const namedAmongMatches = matches.find((n) => n === paramName);
+  if (namedAmongMatches !== undefined) {
+    return { beanName: namedAmongMatches, skippedAsOptional: false, diagnostics: [] };
+  }
+
   return {
     beanName: null,
     skippedAsOptional: false,

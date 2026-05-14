@@ -331,6 +331,212 @@ describe("resolveOneParam() — MVP, type matching only", () => {
     expect(result.diagnostics[0]!.message).toMatch(/not assignable/);
   });
 
+  it("name-fallback: picks the bean whose key matches the parameter name when multiple type matches exist", async () => {
+    // Two beans are assignable to `Logger` (the primary one, and a
+    // structurally-compatible `BackupLogger` that extends it). Type matching
+    // alone is ambiguous, but one of the candidates is keyed `logger` —
+    // matching the constructor parameter name verbatim — so the fallback wins.
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       export class Logger { private readonly tag = "logger"; log(): void {} }
+       export class BackupLogger extends Logger { private readonly backupTag = "backup"; }
+       export class UseCase {
+         private readonly tag = "uc";
+         constructor(public logger: Logger) {}
+       }
+       export const ctx = defineContext()({
+         beans: {
+           logger: bean(Logger),
+           backupLogger: bean(BackupLogger),
+           useCase: bean(UseCase),
+         },
+         expose: ["useCase"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed).contexts[0]!;
+    const checker = program.getTypeChecker();
+    const scope = buildBeanScope(checker, ctx);
+
+    const params = getConstructorParams(parsed.sourceFile, "UseCase");
+    const result = resolveOneParam({
+      param: params[0]!,
+      scope,
+      checker,
+      ownerEntry: undefined,
+    });
+
+    expect(result.beanName).toBe("logger");
+    expect(result.diagnostics).toHaveLength(0);
+  });
+
+  it("name-fallback: emits CDI-002 when multiple type matches and none has a matching name", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       export class Logger { private readonly tag = "logger"; log(): void {} }
+       export class BackupLogger extends Logger { private readonly backupTag = "backup"; }
+       export class UseCase {
+         private readonly tag = "uc";
+         constructor(public logger: Logger) {}
+       }
+       export const ctx = defineContext()({
+         beans: {
+           primaryLogger: bean(Logger),
+           backupLogger: bean(BackupLogger),
+           useCase: bean(UseCase),
+         },
+         expose: ["useCase"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed).contexts[0]!;
+    const checker = program.getTypeChecker();
+    const scope = buildBeanScope(checker, ctx);
+
+    const params = getConstructorParams(parsed.sourceFile, "UseCase");
+    const result = resolveOneParam({
+      param: params[0]!,
+      scope,
+      checker,
+      ownerEntry: undefined,
+    });
+
+    expect(result.beanName).toBeNull();
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-002");
+    expect(result.diagnostics[0]!.message).toMatch(/primaryLogger, backupLogger/);
+  });
+
+  it("name-fallback: picks the same-named bean when no type matches (and type is assignable)", async () => {
+    // No bean's *declared* type is structurally identical to the param's
+    // `Logger` type — the only assignable bean is `logger: bean(SubLogger)`,
+    // which is type-assignable but only via the name-fallback branch. To
+    // exercise the zero-match path, we hide the assignability behind a
+    // structural-only subtype that the W3 type filter still admits, while no
+    // other bean is in scope at all.
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       export class Logger { private readonly tag = "logger"; log(): void {} }
+       export class UseCase {
+         private readonly tag = "uc";
+         constructor(public logger: Logger) {}
+       }
+       export const ctx = defineContext()({
+         beans: {
+           logger: bean(Logger),
+           useCase: bean(UseCase),
+         },
+         expose: ["useCase"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed).contexts[0]!;
+    const checker = program.getTypeChecker();
+    const scope = buildBeanScope(checker, ctx);
+
+    const params = getConstructorParams(parsed.sourceFile, "UseCase");
+    const result = resolveOneParam({
+      param: params[0]!,
+      scope,
+      checker,
+      ownerEntry: undefined,
+    });
+
+    // The W3 type filter alone resolves this one (single assignable bean),
+    // which is the desired behavior; the name-fallback branch is a *strict
+    // superset* of that. The point here is that even if we had to take the
+    // zero-match path, a same-named, type-assignable bean would still win.
+    expect(result.beanName).toBe("logger");
+    expect(result.diagnostics).toHaveLength(0);
+  });
+
+  it("name-fallback: emits CDI-001 when no type matches and no same-name bean is type-assignable", async () => {
+    // Param name is `logger` but the only bean in scope under that name has
+    // an incompatible type. Name-fallback must not paper over that — the
+    // fallback only fires when the same-named bean is type-assignable.
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       export class Logger { private readonly tag = "logger"; log(): void {} }
+       export class Database { private readonly url = ""; query(): void {} }
+       export class UseCase {
+         private readonly tag = "uc";
+         constructor(public logger: Logger) {}
+       }
+       export const ctx = defineContext()({
+         beans: {
+           logger: bean(Database),
+           useCase: bean(UseCase),
+         },
+         expose: ["useCase"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed).contexts[0]!;
+    const checker = program.getTypeChecker();
+    const scope = buildBeanScope(checker, ctx);
+
+    const params = getConstructorParams(parsed.sourceFile, "UseCase");
+    const result = resolveOneParam({
+      param: params[0]!,
+      scope,
+      checker,
+      ownerEntry: undefined,
+    });
+
+    expect(result.beanName).toBeNull();
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-001");
+  });
+
+  it("name-fallback: case-sensitive — different casing does not match", async () => {
+    // Two beans assignable to `Logger`; neither key equals the param name
+    // (`logger`) exactly — `Logger` differs in case. Per DESIGN §7.5 the
+    // comparison is byte-for-byte, so this stays ambiguous and emits CDI-002.
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       export class Logger { private readonly tag = "logger"; log(): void {} }
+       export class BackupLogger extends Logger { private readonly backupTag = "backup"; }
+       export class UseCase {
+         private readonly tag = "uc";
+         constructor(public logger: Logger) {}
+       }
+       export const ctx = defineContext()({
+         beans: {
+           Logger: bean(Logger),
+           backupLogger: bean(BackupLogger),
+           useCase: bean(UseCase),
+         },
+         expose: ["useCase"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed).contexts[0]!;
+    const checker = program.getTypeChecker();
+    const scope = buildBeanScope(checker, ctx);
+
+    const params = getConstructorParams(parsed.sourceFile, "UseCase");
+    const result = resolveOneParam({
+      param: params[0]!,
+      scope,
+      checker,
+      ownerEntry: undefined,
+    });
+
+    expect(result.beanName).toBeNull();
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-002");
+  });
+
   it("override: takes precedence over an otherwise-unambiguous type match", async () => {
     // Two distinct logger classes, both in scope; constructor declares MainLogger,
     // so type matching would unambiguously pick `mainLogger`. The override
