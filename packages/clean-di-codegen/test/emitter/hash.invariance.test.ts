@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  hashGeneratedFileWithBreakdown,
-  type HashInputs,
-} from "../../src/emitter/hash";
+import { hashGeneratedFileWithBreakdown, type HashInputs } from "../../src/emitter/hash";
 
 const baseline: HashInputs = {
   sourceFileContent: "export const x = 1;",

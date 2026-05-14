@@ -66,17 +66,13 @@ export function collectContexts(parsed: ParsedDiFile): CollectContextsResult {
 
     const spec = innerCall.arguments[0];
     if (spec === undefined || !ts.isObjectLiteralExpression(spec)) {
-      diagnostics.push(
-        cdi005(innerCall, "spec argument must be an inline object literal"),
-      );
+      diagnostics.push(cdi005(innerCall, "spec argument must be an inline object literal"));
       continue;
     }
 
     const beansProp = findProperty(spec, "beans");
     if (beansProp === undefined || !ts.isObjectLiteralExpression(beansProp.initializer)) {
-      diagnostics.push(
-        cdi005(spec, "`beans` field is required and must be an object literal"),
-      );
+      diagnostics.push(cdi005(spec, "`beans` field is required and must be an object literal"));
       continue;
     }
 
