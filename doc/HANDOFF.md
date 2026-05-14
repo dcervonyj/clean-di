@@ -301,4 +301,59 @@ These were raised but never fully resolved. Worth re-deciding before W5/W6.
 
 ---
 
-_End of handoff. Cross-references: `doc/DESIGN.md` for the architectural spec, `doc/BACKLOG.md` for the full task list, `doc/REPO_GUIDE.md` for the verification plan + repo map._
+_End of original handoff. Cross-references: `doc/DESIGN.md` for the architectural spec, `doc/BACKLOG.md` for the full task list, `doc/REPO_GUIDE.md` for the verification plan + repo map._
+
+---
+
+## 8. State at end of fix/p0-pre-w5-gaps (W6 + W7 in progress)
+
+### Branch
+
+`fix/p0-pre-w5-gaps` — active, not yet merged to `master`.
+
+### Tests
+
+- **259 passing / 259 total** across all workspace packages (`pnpm test`)
+- Coverage thresholds: 100 % lines/functions/statements for `clean-di`; 85 % for `clean-di-codegen` — both configured in each package's `vitest.config.ts`
+- `pnpm test:coverage` runs coverage from the root; per-package `test:coverage` scripts also available
+
+### What was done in this phase (T-067 → T-075)
+
+| Commit | Tasks | Notes |
+|--------|-------|-------|
+| `213ec60` | T-067 | `examples/full-blog-app/`; `provide()` return-type fix; lifecycle `cfg` arity fix |
+| `adca9df` | T-068 | Examples wired into pnpm workspace + CI build |
+| `383f9f7` | T-069–T-074 | Docs (README, GETTING_STARTED, MIGRATION, REPO_GUIDE), TypeDoc, per-example tests (259 tests) |
+| `e5c87b9` | T-075 | Coverage config in each vitest.config; `test:coverage` scripts; CI artifact upload |
+
+### Last pushed commit
+
+`e5c87b9` — all above are **pushed** to `origin/fix/p0-pre-w5-gaps`.
+
+### Uncommitted / untracked WIP (not yet committed)
+
+| File | Task | Status |
+|------|------|--------|
+| `CONTRIBUTING.md` | T-073 | Written, untracked — needs `CODE_OF_CONDUCT.md` + README cross-link before committing |
+| `scripts/smoke-test.sh` | T-076 | Written, untracked — needs `chmod +x` + CI job added before committing |
+
+### Remaining tasks (T-073 → T-081)
+
+| ID | Description | Notes |
+|----|-------------|-------|
+| **T-073** | CONTRIBUTING + CODE_OF_CONDUCT + README contributing section | `CONTRIBUTING.md` already written; still need `CODE_OF_CONDUCT.md` (Contributor Covenant v2.1, contact `dcervonyj@gmail.com`) and a "Contributing" section added to `README.md` |
+| **T-076** | Bin smoke test + CI job | `scripts/smoke-test.sh` already written; `chmod +x`; add `smoke-test` job to `.github/workflows/ci.yml` (`needs: ci`) |
+| **T-077** | Adopt Changesets | `pnpm dlx @changesets/cli init`; set `baseBranch: "master"` in `.changeset/config.json`; add changeset-status check to CI `on: pull_request` |
+| **T-078** | `doc/VERSIONING.md` | Semver policy, compat matrix, `pnpm changeset` usage, major-bump regeneration requirement; cross-link from `CONTRIBUTING.md` |
+| **T-079** | npm publish workflow | `.github/workflows/release.yml` using `changesets/action@v1`; triggers on push to `master`; needs `NPM_TOKEN` secret |
+| **T-080** | `doc/API_FREEZE.md` | Full public API surface; pre-release checklist |
+| **T-081** | Cut v1.0.0 | `changeset version`; regenerate examples; `pnpm build && pnpm test`; tag `v1.0.0`; push |
+
+**Suggested order:** T-073 → T-076 → T-077 → T-078 + T-079 + T-080 (parallel) → T-081.
+
+### Key facts
+
+- All 3 examples (`basic`, `modular`, `full-blog-app`) build, run, and pass `check:codegen`
+- Generated files (`*.di.generated.ts`) are **committed** — never gitignored
+- Git author for all commits: `dcervonyj <dcervonyj@gmail.com>`
+- Commit format: `<type>(T-NNN): <imperative description>` + `Co-authored-by: Copilot` trailer
