@@ -57,10 +57,7 @@ export function resolveOneParam(input: ResolveParamInput): ResolveParamResult {
   // silently match every bean in scope (footgun); `never` is uninhabited and
   // cannot meaningfully be satisfied. Emit CDI-002 either way and point the
   // user at an explicit override.
-  if (
-    (paramType.flags & ts.TypeFlags.Any) !== 0 ||
-    (paramType.flags & ts.TypeFlags.Never) !== 0
-  ) {
+  if ((paramType.flags & ts.TypeFlags.Any) !== 0 || (paramType.flags & ts.TypeFlags.Never) !== 0) {
     return {
       beanName: null,
       skippedAsOptional: false,
