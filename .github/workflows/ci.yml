@@ -41,3 +41,17 @@ jobs:
 
       - name: Build examples
         run: pnpm --filter './examples/*' build
+
+      - name: Coverage report
+        if: matrix.node-version == 20
+        run: pnpm --filter clean-di test:coverage && pnpm --filter clean-di-codegen test:coverage
+
+      - name: Upload coverage
+        if: matrix.node-version == 20
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: |
+            packages/clean-di/coverage/lcov.info
+            packages/clean-di-codegen/coverage/lcov.info
+          retention-days: 14
