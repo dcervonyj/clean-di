@@ -27,11 +27,22 @@ export interface EmitInput {
   readonly reporter: DiagnosticReporter;
   /** clean-di-codegen package version. */
   readonly generatorVersion: string;
+  /**
+   * When true, skip writing the generated file. Returns `stale: true` if the
+   * existing file is missing or differs from what would be generated. Used by
+   * `--check` mode (DESIGN §7.9).
+   */
+  readonly dryRun?: boolean;
 }
 
 export interface RunResult {
   /** True if the generated file was written (or rewritten). False if skipped by hash. */
   readonly wrote: boolean;
+  /**
+   * In dryRun mode: true if the file is missing or its content differs from
+   * what would be generated. Always false in normal (write) mode.
+   */
+  readonly stale: boolean;
   /** All diagnostics raised. */
   readonly diagnostics: readonly Diagnostic[];
   /** Path of the generated file. */
@@ -65,7 +76,7 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
       reporter.add(d);
     }
 
-    return { wrote: false, diagnostics: allDiagnostics, outputPath };
+    return { wrote: false, stale: false, diagnostics: allDiagnostics, outputPath };
   }
 
   // W3 MVP supports a single context per file. Take the first well-formed one.
@@ -143,7 +154,7 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
       reporter.add(d);
     }
 
-    return { wrote: false, diagnostics: allDiagnostics, outputPath };
+    return { wrote: false, stale: false, diagnostics: allDiagnostics, outputPath };
   }
 
   // If we already collected non-cycle errors, still emit them but don't write.
@@ -152,7 +163,7 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
       reporter.add(d);
     }
 
-    return { wrote: false, diagnostics: allDiagnostics, outputPath };
+    return { wrote: false, stale: false, diagnostics: allDiagnostics, outputPath };
   }
 
   // 3d: format the generated file.
@@ -204,19 +215,28 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     preDestroySources,
   });
 
+  // dryRun: compare against committed file without writing (DESIGN §7.9 --check).
+  if (input.dryRun === true) {
+    if (!existsSync(outputPath)) {
+      return { wrote: false, stale: true, diagnostics: [], outputPath };
+    }
+    const existing = await readFile(outputPath, "utf8");
+    return { wrote: false, stale: existing !== generated, diagnostics: [], outputPath };
+  }
+
   // Hash-based skip (DESIGN §7.9).
   if (existsSync(outputPath)) {
     const existing = await readFile(outputPath, "utf8");
     const existingHashMatch = existing.match(/Hash: sha256:([0-9a-f]+)/);
     if (existingHashMatch !== null && existingHashMatch[1] === hash) {
-      return { wrote: false, diagnostics: [], outputPath };
+      return { wrote: false, stale: false, diagnostics: [], outputPath };
     }
   }
 
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, generated, "utf8");
 
-  return { wrote: true, diagnostics: [], outputPath };
+  return { wrote: true, stale: false, diagnostics: [], outputPath };
 }
 
 function computeOutputPath(sourcePath: string): string {
