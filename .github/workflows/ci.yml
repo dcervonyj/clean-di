@@ -39,7 +39,12 @@ jobs:
       - run: pnpm build
 
       - name: Check generated files are up to date
-        run: pnpm --filter './examples/*' check:codegen
+        run: |
+          CODEGEN="$GITHUB_WORKSPACE/packages/clean-di-codegen/dist/bin.js"
+          for dir in examples/*/; do
+            echo "Checking $dir"
+            (cd "$GITHUB_WORKSPACE/$dir" && node "$CODEGEN" --check)
+          done
 
       - name: Build examples
         run: pnpm --filter './examples/*' build

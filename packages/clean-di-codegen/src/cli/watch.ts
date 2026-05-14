@@ -42,7 +42,10 @@ export async function runWatch(options: RunWatchOptions): Promise<() => Promise<
     );
   }
 
-  async function emitFile(filePath: string, program: ReturnType<typeof buildProgram>["program"]): Promise<void> {
+  async function emitFile(
+    filePath: string,
+    program: ReturnType<typeof buildProgram>["program"],
+  ): Promise<void> {
     const reporter = makeReporter();
     try {
       await emitGeneratedFile({

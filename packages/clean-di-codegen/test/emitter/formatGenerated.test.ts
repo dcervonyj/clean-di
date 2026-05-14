@@ -93,7 +93,9 @@ describe("formatGenerated()", () => {
   it("emits postConstruct field when a single postConstructSource is provided", () => {
     const out = formatGenerated({
       ...baseInput,
-      postConstructSources: [{ src: "({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); }", passCfg: true }],
+      postConstructSources: [
+        { src: "({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); }", passCfg: true },
+      ],
     });
 
     // Single hook → inline expression form, cfg passed because passCfg = true.
@@ -127,8 +129,12 @@ describe("formatGenerated()", () => {
 
     // Block form wraps all hooks in a block arrow.
     expect(out).toContain("postConstruct: (cfg) => {");
-    expect(out).toContain("(({ logger }) => { logger.info('imported init'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts });");
-    expect(out).toContain("(({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg);");
+    expect(out).toContain(
+      "(({ logger }) => { logger.info('imported init'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts });",
+    );
+    expect(out).toContain(
+      "(({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg);",
+    );
     expect(out).not.toContain("preDestroy:");
   });
 
@@ -142,8 +148,12 @@ describe("formatGenerated()", () => {
     });
 
     expect(out).toContain("preDestroy: (cfg) => {");
-    expect(out).toContain("(({ logger }) => { logger.info('first destroy'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts });");
-    expect(out).toContain("(({ logger }) => { logger.info('second destroy'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts });");
+    expect(out).toContain(
+      "(({ logger }) => { logger.info('first destroy'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts });",
+    );
+    expect(out).toContain(
+      "(({ logger }) => { logger.info('second destroy'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts });",
+    );
   });
 
   it("emits neither postConstruct nor preDestroy when both arrays are empty", () => {
