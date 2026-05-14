@@ -1,0 +1,8 @@
+{
+  "diagnostics": [
+    {
+      "code": "CDI-002",
+      "messageMatches": "audit"
+    }
+  ]
+}
