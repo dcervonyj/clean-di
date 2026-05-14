@@ -1,0 +1,7 @@
+[
+  {
+    "code": "CDI-008",
+    "file": "input.di.ts",
+    "messageMatches": "private or protected"
+  }
+]

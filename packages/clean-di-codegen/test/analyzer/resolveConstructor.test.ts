@@ -276,6 +276,35 @@ describe("resolveConstructor()", () => {
     expect(result.diagnostics[0]!.message).toMatch(/destructured/i);
   });
 
+  it("refuses abstract classes with CDI-008", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       export abstract class AbstractThing {
+         private readonly tag = "a";
+         constructor() {}
+         abstract run(): void;
+       }
+       export const ctx = defineContext()({
+         beans: { x: bean(AbstractThing) },
+         expose: ["x"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed)[0]!;
+    const checker = program.getTypeChecker();
+    const scope = buildBeanScope(checker, ctx);
+    const cls = findClass(parsed.sourceFile, "AbstractThing");
+
+    const result = resolveConstructor({ classDeclaration: cls, scope, checker });
+
+    expect(result.refused).toBe(true);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-008");
+    expect(result.diagnostics[0]!.message).toMatch(/abstract/i);
+  });
+
   it("propagates CDI-001 from resolveOneParam when a parameter is unresolvable", async () => {
     const { program, filePath, cleanup } = await buildFixture(
       `import { defineContext, bean } from "clean-di";

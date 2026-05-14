@@ -27,6 +27,7 @@ export interface ResolveConstructorResult {
  * Resolve a class's constructor signature against the bean scope.
  *
  * Behavior:
+ *  - Abstract class → emits CDI-008, returns `refused: true`.
  *  - No explicit constructor (synthesized default) → returns `args: []`.
  *  - Zero-arg explicit constructor → returns `args: []`.
  *  - Private or protected constructor → emits CDI-008, returns `refused: true`.
@@ -37,6 +38,18 @@ export interface ResolveConstructorResult {
  */
 export function resolveConstructor(input: ResolveConstructorInput): ResolveConstructorResult {
   const { classDeclaration, scope, checker } = input;
+
+  // Abstract class — cannot be instantiated via `new`, refuse with CDI-008.
+  if (isAbstractClass(classDeclaration)) {
+    return {
+      args: [],
+      diagnostics: [
+        diagCdi008(classDeclaration, "abstract classes cannot be instantiated via `bean(...)`"),
+      ],
+      refused: true,
+    };
+  }
+
   const ctor = findFirstConstructor(classDeclaration);
 
   // No constructor declared — default no-arg constructor.
@@ -104,6 +117,12 @@ function hasInaccessibleModifier(ctor: ts.ConstructorDeclaration): boolean {
     if (mod.kind === ts.SyntaxKind.ProtectedKeyword) return true;
   }
   return false;
+}
+
+function isAbstractClass(cls: ts.ClassDeclaration): boolean {
+  const modifiers = ts.getModifiers(cls);
+  if (modifiers === undefined) return false;
+  return modifiers.some((m) => m.kind === ts.SyntaxKind.AbstractKeyword);
 }
 
 function diagCdi008(node: ts.Node, detail: string): Diagnostic {
