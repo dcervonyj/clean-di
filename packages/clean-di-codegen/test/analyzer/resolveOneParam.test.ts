@@ -10,7 +10,9 @@ import { collectContexts } from "../../src/analyzer/collectContexts";
 import { parseDiFile } from "../../src/analyzer/parseDiFile";
 import { resolveOneParam } from "../../src/analyzer/resolveOneParam";
 
-async function buildFixture(diSource: string): Promise<{ program: ts.Program; filePath: string; cleanup: () => Promise<void> }> {
+async function buildFixture(
+  diSource: string,
+): Promise<{ program: ts.Program; filePath: string; cleanup: () => Promise<void> }> {
   const root = join(tmpdir(), `clean-di-resolve-test-${Date.now()}-${Math.random()}`);
   const cleanDiDir = join(root, "node_modules", "clean-di", "src", "public");
   await mkdir(cleanDiDir, { recursive: true });
@@ -93,9 +95,15 @@ describe("resolveOneParam() — MVP, type matching only", () => {
 
   it("resolves a parameter when exactly one bean type matches", async () => {
     const { program, filePath, cleanup } = await buildFixture(
+      // Classes have distinct private members so TypeScript treats them as
+      // nominally different (empty classes are structurally identical).
       `import { defineContext, bean } from "clean-di";
-       export class Logger {}
-       export class UseCase { constructor(public logger: Logger) {} }
+       export class Logger { private readonly tag = "logger"; log(): void {} }
+       export class UseCase {
+         private readonly tag = "use-case";
+         constructor(public logger: Logger) {}
+         run(): void {}
+       }
        export const ctx = defineContext()({
          beans: { logger: bean(Logger), useCase: bean(UseCase) },
          expose: ["useCase"] as const,
@@ -118,9 +126,12 @@ describe("resolveOneParam() — MVP, type matching only", () => {
   it("emits CDI-001 when no bean matches a required parameter", async () => {
     const { program, filePath, cleanup } = await buildFixture(
       `import { defineContext, bean } from "clean-di";
-       export class Logger {}
-       export class Database {}
-       export class UseCase { constructor(public db: Database) {} }
+       export class Logger { private readonly tag = "logger"; log(): void {} }
+       export class Database { private readonly url = ""; query(): void {} }
+       export class UseCase {
+         private readonly tag = "use-case";
+         constructor(public db: Database) {}
+       }
        export const ctx = defineContext()({
          beans: { logger: bean(Logger), useCase: bean(UseCase) },
          expose: ["useCase"] as const,
