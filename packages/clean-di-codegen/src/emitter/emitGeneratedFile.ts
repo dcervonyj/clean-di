@@ -13,6 +13,7 @@ import { collectContexts } from "../analyzer/collectContexts.js";
 import { buildBeanScopeWithImports, type BeanScopeEntry } from "../analyzer/buildBeanScope.js";
 import { resolveConstructor } from "../analyzer/resolveConstructor.js";
 import { topoSort } from "../analyzer/topoSort.js";
+import { validateExpose } from "../analyzer/validateExpose.js";
 import { formatGenerated, type EmittedBean, type EmittedImport } from "./formatGenerated.js";
 import { hashGeneratedFile } from "./hash.js";
 
@@ -75,6 +76,10 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
 
   // Merge scope-resolution diagnostics (CDI-006, CDI-010) into the running list.
   allDiagnostics.push(...scopeDiagnostics);
+
+  // Validate the `expose` whitelist (CDI-004) — every exposed name must exist
+  // in the assembled scope.
+  allDiagnostics.push(...validateExpose(context, localScope));
 
   // 3b: resolve each bean's constructor.
   const resolvedArgs = new Map<string, readonly (string | null)[]>();
