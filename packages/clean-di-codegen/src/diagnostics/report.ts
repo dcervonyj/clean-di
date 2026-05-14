@@ -1,4 +1,4 @@
-import pc from "picocolors";
+import { createColors } from "picocolors";
 
 import type { Diagnostic } from "./codes.js";
 import { formatDiagnostic } from "./formatDiagnostic.js";
@@ -59,8 +59,11 @@ export class DiagnosticReporter {
   }
 
   private applyColor(d: Diagnostic, formatted: string): string {
-    // Colorize the `error CDI-NNN:` token red, leave the rest alone.
+    // Force colors on when the caller declared the destination as TTY-capable.
+    // picocolors' default auto-detection disables color in non-TTY (e.g. vitest)
+    // streams, which would defeat the explicit `isTty: true` opt-in.
+    const colors = createColors(true);
     const codePattern = new RegExp(`(error ${d.code}:)`);
-    return formatted.replace(codePattern, pc.red("$1"));
+    return formatted.replace(codePattern, colors.red("$1"));
   }
 }
