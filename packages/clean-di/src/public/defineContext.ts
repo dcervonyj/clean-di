@@ -26,10 +26,7 @@ export function defineContext<TConfig = void>(): <TBeans extends Beans>(
 ) => Container<TConfig, ExposedOf<TBeans, GetExposeKeys<TBeans, ContextSpec<TConfig, TBeans>>>> {
   return <TBeans extends Beans>(
     spec: ContextSpec<TConfig, TBeans>,
-  ): Container<
-    TConfig,
-    ExposedOf<TBeans, GetExposeKeys<TBeans, ContextSpec<TConfig, TBeans>>>
-  > => {
+  ): Container<TConfig, ExposedOf<TBeans, GetExposeKeys<TBeans, ContextSpec<TConfig, TBeans>>>> => {
     const FAIL_MESSAGE =
       "clean-di: this Container is a placeholder. " +
       "Run `clean-di-codegen` to produce the .di.generated.ts file that backs this context.";
@@ -56,9 +53,10 @@ export function defineContext<TConfig = void>(): <TBeans extends Beans>(
 }
 
 /** Helper: extract the `expose` field's tuple type from a spec. */
-type GetExposeKeys<TBeans extends Beans, S extends ContextSpec<unknown, TBeans>> =
-  S extends { readonly expose: infer E }
-    ? E extends readonly (keyof TBeans & string)[]
-      ? E
-      : readonly (keyof TBeans & string)[]
-    : readonly (keyof TBeans & string)[];
+type GetExposeKeys<TBeans extends Beans, S extends ContextSpec<unknown, TBeans>> = S extends {
+  readonly expose: infer E;
+}
+  ? E extends readonly (keyof TBeans & string)[]
+    ? E
+    : readonly (keyof TBeans & string)[]
+  : readonly (keyof TBeans & string)[];

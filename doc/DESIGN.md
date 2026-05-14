@@ -274,9 +274,7 @@ Beans not in `expose` are private — used internally for wiring but invisible t
 ```ts
 export interface Container<TConfig, TExposed> {
   get(
-    options: TConfig extends void
-      ? { key?: unknown }
-      : { config: TConfig; key?: unknown },
+    options: TConfig extends void ? { key?: unknown } : { config: TConfig; key?: unknown },
   ): TExposed;
   destroy(key?: unknown): void;
   destroyAll(): void;
@@ -436,25 +434,20 @@ import { createContext } from "clean-di/runtime";
 
 import type { PostsContextConfig } from "./PostsContext.di";
 
-export const postsContext = createContext<
-  PostsContextConfig,
-  { listPosts: ListPostsUseCase }
->((cfg) => {
-  const apiBaseUrl = cfg.apiBaseUrl;
-  const authToken = cfg.authToken;
-  const logger = new Logger("posts");
-  const postsRepository = new HttpPostsRepository(
-    apiBaseUrl,
-    authToken,
-    logger,
-  );
-  const listPosts = new ListPostsUseCase(postsRepository);
+export const postsContext = createContext<PostsContextConfig, { listPosts: ListPostsUseCase }>(
+  (cfg) => {
+    const apiBaseUrl = cfg.apiBaseUrl;
+    const authToken = cfg.authToken;
+    const logger = new Logger("posts");
+    const postsRepository = new HttpPostsRepository(apiBaseUrl, authToken, logger);
+    const listPosts = new ListPostsUseCase(postsRepository);
 
-  return {
-    bag: { apiBaseUrl, authToken, logger, postsRepository, listPosts },
-    expose: { listPosts },
-  };
-});
+    return {
+      bag: { apiBaseUrl, authToken, logger, postsRepository, listPosts },
+      expose: { listPosts },
+    };
+  },
+);
 ```
 
 ### 7.9 Hash-based skip and `--check`
@@ -774,16 +767,9 @@ export const blogContext = defineContext<BlogConfig>()({
     listPosts: bean(ListPostsUseCase),
     createPost: bean(CreatePostUseCase),
   },
-  postConstruct: ({ logger }, cfg) =>
-    logger.info(`blog ready ${cfg.apiBaseUrl}`),
+  postConstruct: ({ logger }, cfg) => logger.info(`blog ready ${cfg.apiBaseUrl}`),
   preDestroy: ({ logger }) => logger.info("blog destroyed"),
-  expose: [
-    "listPosts",
-    "createPost",
-    "listComments",
-    "deleteComment",
-    "getCurrentUser",
-  ] as const,
+  expose: ["listPosts", "createPost", "listComments", "deleteComment", "getCurrentUser"] as const,
 });
 ```
 

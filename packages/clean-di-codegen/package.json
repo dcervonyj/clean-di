@@ -15,7 +15,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -b",
     "test": "vitest run",
@@ -31,7 +33,9 @@
     "typescript": ">=5.0.0"
   },
   "peerDependenciesMeta": {
-    "typescript": { "optional": false }
+    "typescript": {
+      "optional": false
+    }
   },
   "devDependencies": {
     "clean-di": "workspace:*"
