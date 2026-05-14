@@ -148,9 +148,7 @@ function renderHookLines(input: FormatGeneratedInput, bagFields: string): readon
   }
 
   if (input.preDestroySource !== undefined) {
-    lines.push(
-      `      preDestroy: (cfg) => (${input.preDestroySource})({ ${bagFields} }, cfg),`,
-    );
+    lines.push(`      preDestroy: (cfg) => (${input.preDestroySource})({ ${bagFields} }, cfg),`);
   }
 
   return lines;

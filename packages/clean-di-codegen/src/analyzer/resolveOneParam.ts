@@ -87,10 +87,7 @@ export function resolveOneParam(input: ResolveParamInput): ResolveParamResult {
     const fallbackEntry = scope.get(paramName);
     if (fallbackEntry !== undefined) {
       const fallbackType = getBeanType(checker, fallbackEntry);
-      if (
-        fallbackType !== undefined &&
-        checker.isTypeAssignableTo(fallbackType, paramType)
-      ) {
+      if (fallbackType !== undefined && checker.isTypeAssignableTo(fallbackType, paramType)) {
         return { beanName: paramName, skippedAsOptional: false, diagnostics: [] };
       }
     }

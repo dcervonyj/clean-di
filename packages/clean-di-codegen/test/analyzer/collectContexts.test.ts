@@ -307,7 +307,11 @@ describe("collectContexts()", () => {
   });
 
   it("does NOT emit CDI-009 when TConfig is `any` or `unknown` (intentional)", async () => {
-    const { program: programAny, filePath: filePathAny, cleanup: cleanupAny } = await buildFixture(
+    const {
+      program: programAny,
+      filePath: filePathAny,
+      cleanup: cleanupAny,
+    } = await buildFixture(
       `import { defineContext, bean } from "clean-di";
        class Foo {}
        export const ctx = defineContext<any>()({

@@ -58,10 +58,7 @@ export interface CollectContextsResult {
  *   4. `expose` must be present and an array literal of string literals.
  *   5. `imports`, if present, must be an array literal.
  */
-export function collectContexts(
-  parsed: ParsedDiFile,
-  checker?: ts.TypeChecker,
-): CollectContextsResult {
+export function collectContexts(parsed: ParsedDiFile): CollectContextsResult {
   const contexts: ContextDeclaration[] = [];
   const diagnostics: Diagnostic[] = [];
   const checker = parsed.program.getTypeChecker();
@@ -172,6 +169,8 @@ interface ExtractedConfigType {
   readonly resolved: boolean;
   /** The original type-node, kept for diagnostic positioning. */
   readonly node: ts.TypeNode | undefined;
+  /** The resolved `ts.Type` — used by `buildBeanScope` to synthesise config beans (T-046). `undefined` for `void` / omitted / unresolved. */
+  readonly type: ts.Type | undefined;
 }
 
 /**
@@ -187,23 +186,29 @@ function extractConfigType(
 ): ExtractedConfigType {
   const typeArgs = outerCall.typeArguments;
   if (typeArgs === undefined || typeArgs.length === 0) {
-    return { typeName: "void", resolved: true, node: undefined };
+    return { typeName: "void", resolved: true, node: undefined, type: undefined };
   }
 
   const node = typeArgs[0]!;
   if (node.kind === ts.SyntaxKind.VoidKeyword) {
-    return { typeName: "void", resolved: true, node };
+    return { typeName: "void", resolved: true, node, type: undefined };
   }
 
   // For non-reference type nodes (intersection, union, literal, keyword like
   // `any`/`unknown`/`never`), there's nothing to "look up" — accept verbatim.
   if (!ts.isTypeReferenceNode(node)) {
-    return { typeName: displayName(node), resolved: true, node };
+    return {
+      typeName: displayName(node),
+      resolved: true,
+      node,
+      type: checker.getTypeFromTypeNode(node),
+    };
   }
 
   const resolved = isTypeReferenceResolved(checker, node);
+  const type = resolved ? checker.getTypeFromTypeNode(node) : undefined;
 
-  return { typeName: displayName(node), resolved, node };
+  return { typeName: displayName(node), resolved, node, type };
 }
 
 /**

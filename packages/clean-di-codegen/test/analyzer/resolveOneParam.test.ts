@@ -557,7 +557,7 @@ describe("resolveOneParam() — MVP, type matching only", () => {
 
     const checker = program.getTypeChecker();
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed, checker).contexts[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const scope = buildBeanScope(checker, ctx);
 
     // Sanity check: the synthetic entry is in scope.

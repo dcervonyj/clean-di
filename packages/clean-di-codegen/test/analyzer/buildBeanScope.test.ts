@@ -368,7 +368,7 @@ describe("buildBeanScopeWithImports() — synthetic config beans (T-046)", () =>
 
     const checker = program.getTypeChecker();
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed, checker).contexts[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const { scope, diagnostics } = buildBeanScopeWithImports(checker, ctx);
 
     expect(diagnostics).toEqual([]);
@@ -396,7 +396,7 @@ describe("buildBeanScopeWithImports() — synthetic config beans (T-046)", () =>
 
     const checker = program.getTypeChecker();
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed, checker).contexts[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const { scope } = buildBeanScopeWithImports(checker, ctx);
 
     // Only the explicit local bean is in scope.
@@ -419,7 +419,7 @@ describe("buildBeanScopeWithImports() — synthetic config beans (T-046)", () =>
 
     const checker = program.getTypeChecker();
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed, checker).contexts[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const { scope } = buildBeanScopeWithImports(checker, ctx);
 
     const tokenEntry = scope.get("token");

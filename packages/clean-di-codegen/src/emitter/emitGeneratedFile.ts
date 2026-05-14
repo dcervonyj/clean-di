@@ -52,7 +52,7 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
   const checker = program.getTypeChecker();
 
   const parsed = parseDiFile(program, sourcePath);
-  const { contexts, diagnostics: shapeDiagnostics } = collectContexts(parsed, checker);
+  const { contexts, diagnostics: shapeDiagnostics } = collectContexts(parsed);
 
   const allDiagnostics: Diagnostic[] = [...shapeDiagnostics];
 
