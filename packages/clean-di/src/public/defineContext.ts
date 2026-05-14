@@ -1,5 +1,5 @@
-import type { Container } from "../runtime/Container";
-import type { Beans, ContextSpec, ExposedOf } from "./types";
+import type { Container } from "../runtime/Container.js";
+import type { Beans, ContextSpec, ExposedOf } from "./types.js";
 
 /**
  * Top-level construct. Returns a curried factory. The outer call pins `TConfig`;
@@ -23,10 +23,16 @@ import type { Beans, ContextSpec, ExposedOf } from "./types";
  */
 export function defineContext<TConfig = void>(): <TBeans extends Beans>(
   spec: ContextSpec<TConfig, TBeans>,
-) => Container<TConfig, ExposedOf<TBeans, GetExposeKeys<TBeans, ContextSpec<TConfig, TBeans>>>> {
+) => Container<
+  TConfig,
+  ExposedOf<TBeans, GetExposeKeys<TConfig, TBeans, ContextSpec<TConfig, TBeans>>>
+> {
   return <TBeans extends Beans>(
     spec: ContextSpec<TConfig, TBeans>,
-  ): Container<TConfig, ExposedOf<TBeans, GetExposeKeys<TBeans, ContextSpec<TConfig, TBeans>>>> => {
+  ): Container<
+    TConfig,
+    ExposedOf<TBeans, GetExposeKeys<TConfig, TBeans, ContextSpec<TConfig, TBeans>>>
+  > => {
     const FAIL_MESSAGE =
       "clean-di: this Container is a placeholder. " +
       "Run `clean-di-codegen` to produce the .di.generated.ts file that backs this context.";
@@ -47,13 +53,19 @@ export function defineContext<TConfig = void>(): <TBeans extends Beans>(
 
     return marker as unknown as Container<
       TConfig,
-      ExposedOf<TBeans, GetExposeKeys<TBeans, ContextSpec<TConfig, TBeans>>>
+      ExposedOf<TBeans, GetExposeKeys<TConfig, TBeans, ContextSpec<TConfig, TBeans>>>
     >;
   };
 }
 
-/** Helper: extract the `expose` field's tuple type from a spec. */
-type GetExposeKeys<TBeans extends Beans, S extends ContextSpec<unknown, TBeans>> = S extends {
+/** Helper: extract the `expose` field's tuple type from a spec.
+ *  Parametrised over `TConfig` (not `unknown`) because `ContextSpec`'s lifecycle
+ *  hooks place `TConfig` in a contravariant position. */
+type GetExposeKeys<
+  TConfig,
+  TBeans extends Beans,
+  S extends ContextSpec<TConfig, TBeans>,
+> = S extends {
   readonly expose: infer E;
 }
   ? E extends readonly (keyof TBeans & string)[]

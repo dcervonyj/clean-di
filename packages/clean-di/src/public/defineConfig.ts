@@ -1,4 +1,4 @@
-import type { Beans, ConfigSpec } from "./types";
+import type { Beans, ConfigSpec } from "./types.js";
 
 declare const DEFINED_CONFIG_BRAND: unique symbol;
 

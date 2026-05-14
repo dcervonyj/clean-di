@@ -1,5 +1,9 @@
-import type { BuildResult } from "./buildResult";
-import type { CachedInstance, Container } from "./Container";
+import type { BuildResult } from "./buildResult.js";
+import type { CachedInstance, Container } from "./Container.js";
+
+// Locally typed `console` — clean-di is framework-agnostic core (no DOM, no Node
+// types pulled in). `console.warn` is universally available in every JS runtime.
+declare const console: { warn(message: string): void };
 
 const SINGLETON_KEY = Symbol("clean-di:singleton");
 

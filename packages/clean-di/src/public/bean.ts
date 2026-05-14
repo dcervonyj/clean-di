@@ -3,7 +3,7 @@
    constructor signature". `unknown[]` doesn't compose with `InstanceType<C>` and
    typed parameter lists would break auto-wiring intent. */
 
-import type { BeanDef } from "./types";
+import type { BeanDef } from "./types.js";
 
 /**
  * Runtime marker emitted by `bean()`. Codegen reads the call expression in the
@@ -33,10 +33,13 @@ export function bean<C extends new (...args: any[]) => any>(
   Class: C,
   overrides?: Partial<Record<string, string>>,
 ): BeanDef<InstanceType<C>> {
-  const marker: BeanMarker<InstanceType<C>> = {
+  // Double-cast via `unknown` is unavoidable: the marker has no value for the
+  // `[BEAN_DEF_BRAND]` unique-symbol key (the brand is type-only). This is the
+  // standard nominal-typing pattern for brand-typed factories.
+  const marker = {
     kind: "bean",
     Class,
     overrides: overrides ?? {},
-  } as BeanMarker<InstanceType<C>>;
+  } as unknown as BeanMarker<InstanceType<C>>;
   return marker;
 }

@@ -1,4 +1,4 @@
-import type { BeanDef } from "./types";
+import type { BeanDef } from "./types.js";
 
 /**
  * Runtime marker emitted by `provide()`. At build time, codegen reads the AST around

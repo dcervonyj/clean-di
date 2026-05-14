@@ -7,5 +7,5 @@
  * engine that generated files need.
  */
 
-export { createContext } from "./runtime/createContext";
-export type { BuildResult } from "./runtime/buildResult";
+export { createContext } from "./runtime/createContext.js";
+export type { BuildResult } from "./runtime/buildResult.js";
