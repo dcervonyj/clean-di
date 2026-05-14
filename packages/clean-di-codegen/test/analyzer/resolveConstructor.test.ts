@@ -98,7 +98,7 @@ describe("resolveConstructor()", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const checker = program.getTypeChecker();
     const scope = buildBeanScope(checker, ctx);
     const cls = findClass(parsed.sourceFile, "Standalone");
@@ -126,7 +126,7 @@ describe("resolveConstructor()", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const checker = program.getTypeChecker();
     const scope = buildBeanScope(checker, ctx);
     const cls = findClass(parsed.sourceFile, "Zero");
@@ -155,7 +155,7 @@ describe("resolveConstructor()", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const checker = program.getTypeChecker();
     const scope = buildBeanScope(checker, ctx);
     const cls = findClass(parsed.sourceFile, "UseCase");
@@ -183,7 +183,7 @@ describe("resolveConstructor()", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const checker = program.getTypeChecker();
     const scope = buildBeanScope(checker, ctx);
     const cls = findClass(parsed.sourceFile, "Factoryish");
@@ -211,7 +211,7 @@ describe("resolveConstructor()", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const checker = program.getTypeChecker();
     const scope = buildBeanScope(checker, ctx);
     const cls = findClass(parsed.sourceFile, "Base");
@@ -237,7 +237,7 @@ describe("resolveConstructor()", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const checker = program.getTypeChecker();
     const scope = buildBeanScope(checker, ctx);
     const cls = findClass(parsed.sourceFile, "Variadic");
@@ -264,7 +264,7 @@ describe("resolveConstructor()", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const checker = program.getTypeChecker();
     const scope = buildBeanScope(checker, ctx);
     const cls = findClass(parsed.sourceFile, "Destructured");
@@ -292,7 +292,7 @@ describe("resolveConstructor()", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const ctx = collectContexts(parsed)[0]!;
+    const ctx = collectContexts(parsed).contexts[0]!;
     const checker = program.getTypeChecker();
     const scope = buildBeanScope(checker, ctx);
     const cls = findClass(parsed.sourceFile, "UseCase");

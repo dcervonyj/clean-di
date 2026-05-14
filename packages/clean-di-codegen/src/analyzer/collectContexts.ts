@@ -1,5 +1,7 @@
 import ts from "typescript";
 
+import { DEFAULT_HINTS, DEFAULT_MESSAGES, type Diagnostic } from "../diagnostics/codes.js";
+
 import type { DiCall, ParsedDiFile } from "./parseDiFile.js";
 
 export interface BeanDeclaration {
@@ -30,29 +32,74 @@ export interface ContextDeclaration {
   readonly callExpression: ts.CallExpression;
 }
 
+export interface CollectContextsResult {
+  readonly contexts: readonly ContextDeclaration[];
+  readonly diagnostics: readonly Diagnostic[];
+}
+
 /**
  * Walk the parsed call list and produce one `ContextDeclaration` per
- * `defineContext` site. Returns an array; multiple contexts per file is allowed
- * but warned to stderr because it's a smell (DESIGN §5.1 implies one per file).
+ * `defineContext` site. Returns the well-formed contexts together with any
+ * `CDI-005 InvalidContextShape` diagnostics raised for malformed sites; the
+ * malformed sites are skipped so emission can proceed for the rest of the file.
+ *
+ * Shape rules enforced here (each violation → CDI-005):
+ *   1. `defineContext<T>()(spec)` must be curried — the outer call must be
+ *      followed by an inner call that passes the spec.
+ *   2. The spec must be an object literal, not a variable / other expression.
+ *   3. `beans` must be present and an object literal.
+ *   4. `expose` must be present and an array literal of string literals.
+ *   5. `imports`, if present, must be an array literal.
  */
-export function collectContexts(parsed: ParsedDiFile): readonly ContextDeclaration[] {
+export function collectContexts(parsed: ParsedDiFile): CollectContextsResult {
   const contexts: ContextDeclaration[] = [];
+  const diagnostics: Diagnostic[] = [];
 
-  // Find every `defineContext` call site and resolve the *inner* call from it.
   for (const call of parsed.calls) {
     if (call.kind !== "defineContext") continue;
 
     const innerCall = findInnerCall(call);
-    if (innerCall === null) continue; // malformed — analyzer's CDI-005 validator (T-048) will pick this up in W4
+    if (innerCall === null) {
+      diagnostics.push(cdi005(call.node, "missing curry — use `defineContext<T>()(spec)`"));
+      continue;
+    }
 
-    const exportName = extractExportName(innerCall);
-    const configTypeName = extractConfigTypeName(call.node);
     const spec = innerCall.arguments[0];
-    if (spec === undefined || !ts.isObjectLiteralExpression(spec)) continue;
+    if (spec === undefined || !ts.isObjectLiteralExpression(spec)) {
+      diagnostics.push(
+        cdi005(innerCall, "spec argument must be an inline object literal"),
+      );
+      continue;
+    }
+
+    const beansProp = findProperty(spec, "beans");
+    if (beansProp === undefined || !ts.isObjectLiteralExpression(beansProp.initializer)) {
+      diagnostics.push(
+        cdi005(spec, "`beans` field is required and must be an object literal"),
+      );
+      continue;
+    }
+
+    const exposeProp = findProperty(spec, "expose");
+    if (exposeProp === undefined || !isExposeArray(exposeProp.initializer)) {
+      diagnostics.push(
+        cdi005(
+          spec,
+          "`expose` field is required and must be a (readonly) array of string literals",
+        ),
+      );
+      continue;
+    }
+
+    const importsProp = findProperty(spec, "imports");
+    if (importsProp !== undefined && !ts.isArrayLiteralExpression(importsProp.initializer)) {
+      diagnostics.push(cdi005(spec, "`imports` field must be an array literal"));
+      continue;
+    }
 
     contexts.push({
-      exportName,
-      configTypeName,
+      exportName: extractExportName(innerCall),
+      configTypeName: extractConfigTypeName(call.node),
       beans: extractBeans(spec),
       expose: extractExposeList(spec),
       postConstruct: extractHook(spec, "postConstruct"),
@@ -69,7 +116,7 @@ export function collectContexts(parsed: ParsedDiFile): readonly ContextDeclarati
     );
   }
 
-  return contexts;
+  return { contexts, diagnostics };
 }
 
 /**
@@ -115,6 +162,30 @@ function extractConfigTypeName(outerCall: ts.CallExpression): string {
   }
 
   return first.getText();
+}
+
+function findProperty(
+  spec: ts.ObjectLiteralExpression,
+  name: string,
+): ts.PropertyAssignment | undefined {
+  for (const prop of spec.properties) {
+    if (!ts.isPropertyAssignment(prop)) continue;
+    if (prop.name === undefined) continue;
+    if (!ts.isIdentifier(prop.name) && !ts.isStringLiteral(prop.name)) continue;
+    if (prop.name.text === name) return prop;
+  }
+
+  return undefined;
+}
+
+function isExposeArray(expr: ts.Expression): boolean {
+  // Strip `as const` / `as Readonly<...>` wrappers — they're shape-equivalent.
+  let init: ts.Expression = expr;
+  while (ts.isAsExpression(init)) {
+    init = init.expression;
+  }
+
+  return ts.isArrayLiteralExpression(init);
 }
 
 function extractBeans(spec: ts.ObjectLiteralExpression): readonly BeanDeclaration[] {
@@ -207,4 +278,18 @@ function extractImports(spec: ts.ObjectLiteralExpression): readonly ts.Expressio
   }
 
   return [];
+}
+
+function cdi005(node: ts.Node, detail: string): Diagnostic {
+  const source = node.getSourceFile();
+  const { line, character } = source.getLineAndCharacterOfPosition(node.getStart());
+
+  return {
+    code: "CDI-005",
+    file: source.fileName,
+    line: line + 1,
+    column: character + 1,
+    message: `${DEFAULT_MESSAGES["CDI-005"]} ${detail}.`,
+    hint: DEFAULT_HINTS["CDI-005"],
+  };
 }

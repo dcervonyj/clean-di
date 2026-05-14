@@ -87,10 +87,11 @@ describe("collectContexts()", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const contexts = collectContexts(parsed);
+    const result = collectContexts(parsed);
 
-    expect(contexts).toHaveLength(1);
-    const ctx = contexts[0]!;
+    expect(result.diagnostics).toEqual([]);
+    expect(result.contexts).toHaveLength(1);
+    const ctx = result.contexts[0]!;
     expect(ctx.exportName).toBe("myContext");
     expect(ctx.configTypeName).toBe("MyConfig");
     expect(ctx.beans.map((b) => b.name)).toEqual(["id", "foo", "bar"]);
@@ -107,8 +108,8 @@ describe("collectContexts()", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const contexts = collectContexts(parsed);
-    expect(contexts[0]!.configTypeName).toBe("void");
+    const result = collectContexts(parsed);
+    expect(result.contexts[0]!.configTypeName).toBe("void");
   });
 
   it("captures postConstruct and preDestroy expressions when present", async () => {
@@ -125,9 +126,9 @@ describe("collectContexts()", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const contexts = collectContexts(parsed);
-    expect(contexts[0]!.postConstruct).toBeDefined();
-    expect(contexts[0]!.preDestroy).toBeDefined();
+    const result = collectContexts(parsed);
+    expect(result.contexts[0]!.postConstruct).toBeDefined();
+    expect(result.contexts[0]!.preDestroy).toBeDefined();
   });
 
   it("captures imports as raw expressions (no resolution in W3)", async () => {
@@ -144,8 +145,8 @@ describe("collectContexts()", () => {
     cleanupFn = cleanup;
 
     const parsed = parseDiFile(program, filePath);
-    const contexts = collectContexts(parsed);
-    expect(contexts[0]!.imports).toHaveLength(1);
+    const result = collectContexts(parsed);
+    expect(result.contexts[0]!.imports).toHaveLength(1);
   });
 
   it("warns on multiple contexts in one file (but still returns them)", async () => {
@@ -160,10 +161,115 @@ describe("collectContexts()", () => {
 
     const parsed = parseDiFile(program, filePath);
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const contexts = collectContexts(parsed);
+    const result = collectContexts(parsed);
 
-    expect(contexts).toHaveLength(2);
+    expect(result.contexts).toHaveLength(2);
     expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/2 contexts/));
+
+    warnSpy.mockRestore();
+  });
+
+  it("CDI-005 fires when defineContext is called without the curry", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       class Foo {}
+       export const ctx = defineContext({
+         beans: { foo: bean(Foo) },
+         expose: ["foo"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const result = collectContexts(parsed);
+
+    expect(result.contexts).toHaveLength(0);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-005");
+    expect(result.diagnostics[0]!.message).toMatch(/missing curry/);
+  });
+
+  it("CDI-005 fires when beans is missing", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext } from "clean-di";
+       export const ctx = defineContext()({
+         expose: ["foo"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const result = collectContexts(parsed);
+
+    expect(result.contexts).toHaveLength(0);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-005");
+    expect(result.diagnostics[0]!.message).toMatch(/beans/);
+  });
+
+  it("CDI-005 fires when expose is missing", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       class Foo {}
+       export const ctx = defineContext()({
+         beans: { foo: bean(Foo) },
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const result = collectContexts(parsed);
+
+    expect(result.contexts).toHaveLength(0);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-005");
+    expect(result.diagnostics[0]!.message).toMatch(/expose/);
+  });
+
+  it("CDI-005 fires when beans is not an object literal", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       class Foo {}
+       const sharedBeans = { foo: bean(Foo) };
+       export const ctx = defineContext()({
+         beans: sharedBeans,
+         expose: ["foo"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const result = collectContexts(parsed);
+
+    expect(result.contexts).toHaveLength(0);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-005");
+    expect(result.diagnostics[0]!.message).toMatch(/beans/);
+  });
+
+  it("still returns well-formed contexts alongside malformed ones", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       class A {}
+       class B {}
+       export const good = defineContext()({
+         beans: { a: bean(A) },
+         expose: ["a"] as const,
+       });
+       export const bad = defineContext()({
+         beans: { b: bean(B) },
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = collectContexts(parsed);
+
+    expect(result.contexts).toHaveLength(1);
+    expect(result.contexts[0]!.exportName).toBe("good");
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]!.code).toBe("CDI-005");
 
     warnSpy.mockRestore();
   });
