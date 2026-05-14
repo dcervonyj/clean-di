@@ -18,6 +18,13 @@ export interface ContextDeclaration {
   readonly exportName: string;
   /** The `<TConfig>` type reference text, or `"void"` when omitted. */
   readonly configTypeName: string;
+  /**
+   * The resolved `ts.Type` of `TConfig` from the outer `defineContext<TConfig>()`
+   * call, or `undefined` when `TConfig` is `void` / omitted, or when no type
+   * checker was supplied to `collectContexts`. Used by `buildBeanScopeWithImports`
+   * to synthesise per-field config beans (T-046).
+   */
+  readonly configType: ts.Type | undefined;
   /** Beans in source order. */
   readonly beans: readonly BeanDeclaration[];
   /** The exposed keys (from `expose: [...] as const`). */
@@ -51,7 +58,10 @@ export interface CollectContextsResult {
  *   4. `expose` must be present and an array literal of string literals.
  *   5. `imports`, if present, must be an array literal.
  */
-export function collectContexts(parsed: ParsedDiFile): CollectContextsResult {
+export function collectContexts(
+  parsed: ParsedDiFile,
+  checker?: ts.TypeChecker,
+): CollectContextsResult {
   const contexts: ContextDeclaration[] = [];
   const diagnostics: Diagnostic[] = [];
   const checker = parsed.program.getTypeChecker();
@@ -104,6 +114,7 @@ export function collectContexts(parsed: ParsedDiFile): CollectContextsResult {
     contexts.push({
       exportName: extractExportName(innerCall),
       configTypeName: configType.typeName,
+      configType: configType.type,
       beans: extractBeans(spec),
       expose: extractExposeList(spec),
       postConstruct: extractHook(spec, "postConstruct"),

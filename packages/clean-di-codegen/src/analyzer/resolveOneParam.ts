@@ -196,6 +196,7 @@ function resolveByOverride(input: ResolveByOverrideInput): ResolveParamResult {
  * Resolve the effective type of a bean scope entry:
  *  - For `bean(Class)` → the instance type of the class.
  *  - For `provide(fn)` → the recorded return type.
+ *  - For synthetic `"config"` entries (T-046) → the recorded config-field type.
  */
 function getBeanType(
   checker: ts.TypeChecker,
@@ -209,7 +210,8 @@ function getBeanType(
     }
     return undefined;
   }
-  // provide
+
+  // provide(...) or synthetic config — both carry their type on `provideType`.
   return entry.provideType;
 }
 

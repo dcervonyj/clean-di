@@ -346,3 +346,86 @@ describe("buildBeanScopeWithImports() — imports resolution (CDI-006, CDI-010)"
     expect(diagnostics[0]!.code).toBe("CDI-010");
   });
 });
+
+describe("buildBeanScopeWithImports() — synthetic config beans (T-046)", () => {
+  let cleanupFn: (() => Promise<void>) | null = null;
+  afterEach(async () => {
+    if (cleanupFn !== null) await cleanupFn();
+    cleanupFn = null;
+  });
+
+  it("synthetic config beans: every TConfig field becomes a scope entry", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       type MyConfig = { apiUrl: string; retries: number };
+       class Foo {}
+       export const ctx = defineContext<MyConfig>()({
+         beans: { foo: bean(Foo) },
+         expose: ["foo"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const checker = program.getTypeChecker();
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed, checker).contexts[0]!;
+    const { scope, diagnostics } = buildBeanScopeWithImports(checker, ctx);
+
+    expect(diagnostics).toEqual([]);
+    expect(scope.get("apiUrl")).toBeDefined();
+    expect(scope.get("apiUrl")!.kind).toBe("config");
+    expect(scope.get("retries")).toBeDefined();
+    expect(scope.get("retries")!.kind).toBe("config");
+    // Synthetic entries carry their effective type on `provideType`.
+    expect(checker.typeToString(scope.get("apiUrl")!.provideType!)).toBe("string");
+    expect(checker.typeToString(scope.get("retries")!.provideType!)).toBe("number");
+    // The explicit local bean still wins on its own name.
+    expect(scope.get("foo")!.kind).toBe("bean");
+  });
+
+  it("synthetic config beans: TConfig=void produces no synthetic entries", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       class Foo {}
+       export const ctx = defineContext<void>()({
+         beans: { foo: bean(Foo) },
+         expose: ["foo"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const checker = program.getTypeChecker();
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed, checker).contexts[0]!;
+    const { scope } = buildBeanScopeWithImports(checker, ctx);
+
+    // Only the explicit local bean is in scope.
+    expect(Array.from(scope.keys())).toEqual(["foo"]);
+  });
+
+  it("synthetic config beans: name-fallback can reach them (type matches)", async () => {
+    // Direct scope inspection — the synthetic entry must be addressable by
+    // its config-field name and its type must be available for matching.
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       type MyConfig = { token: string };
+       class Foo {}
+       export const ctx = defineContext<MyConfig>()({
+         beans: { foo: bean(Foo) },
+         expose: ["foo"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const checker = program.getTypeChecker();
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed, checker).contexts[0]!;
+    const { scope } = buildBeanScopeWithImports(checker, ctx);
+
+    const tokenEntry = scope.get("token");
+    expect(tokenEntry).toBeDefined();
+    expect(tokenEntry!.kind).toBe("config");
+    // Type-matching surface: the entry's effective type matches its field type.
+    expect(checker.typeToString(tokenEntry!.provideType!)).toBe("string");
+  });
+});
