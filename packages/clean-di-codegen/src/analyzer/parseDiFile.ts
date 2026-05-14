@@ -10,6 +10,12 @@ export interface DiCall {
 export interface ParsedDiFile {
   readonly sourceFile: ts.SourceFile;
   readonly calls: readonly DiCall[];
+  /**
+   * The TS program the source file belongs to. Kept here so downstream
+   * analyzers (e.g., `collectContexts`) can pull a type checker without
+   * having to thread the program through every call site.
+   */
+  readonly program: ts.Program;
 }
 
 /**
@@ -43,7 +49,7 @@ export function parseDiFile(program: ts.Program, filePath: string): ParsedDiFile
 
   visit(sourceFile);
 
-  return { sourceFile, calls };
+  return { sourceFile, calls, program };
 }
 
 /**
