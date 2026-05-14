@@ -303,7 +303,11 @@ function extractBeans(
       const beanName = beanProp.name.text;
       const rhs = beanProp.initializer;
 
-      const kind = ts.isCallExpression(rhs) ? callKinds.get(rhs) : undefined;
+      if (!ts.isCallExpression(rhs)) {
+        diagnostics.push(cdi007(rhs, beanName));
+        continue;
+      }
+      const kind = callKinds.get(rhs);
       if (kind === undefined) {
         diagnostics.push(cdi007(rhs, beanName));
         continue;
