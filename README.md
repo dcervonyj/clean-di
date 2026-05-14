@@ -19,9 +19,9 @@ Most TypeScript DI frameworks require `experimentalDecorators`, `emitDecoratorMe
 
 ## Packages
 
-| Package | Description |
-|---|---|
-| [`clean-di`](./packages/clean-di) | Runtime library — `defineContext`, `bean`, `Container` |
+| Package                                           | Description                                                         |
+| ------------------------------------------------- | ------------------------------------------------------------------- |
+| [`clean-di`](./packages/clean-di)                 | Runtime library — `defineContext`, `bean`, `Container`              |
 | [`clean-di-codegen`](./packages/clean-di-codegen) | CLI code generator — reads `.di.ts` files, emits `.di.generated.ts` |
 
 ## Install
@@ -72,10 +72,10 @@ The codegen step happens once (or whenever your context changes). At runtime, `c
 
 ## Examples
 
-| Example | Description |
-|---|---|
-| [basic](./examples/basic/README.md) | Minimal setup: two beans, one config type |
-| [modular](./examples/modular/README.md) | Multiple contexts with cross-context imports |
+| Example                                             | Description                                           |
+| --------------------------------------------------- | ----------------------------------------------------- |
+| [basic](./examples/basic/README.md)                 | Minimal setup: two beans, one config type             |
+| [modular](./examples/modular/README.md)             | Multiple contexts with cross-context imports          |
 | [full-blog-app](./examples/full-blog-app/README.md) | Real-world layered app (controllers, services, repos) |
 
 ## Docs
@@ -86,15 +86,19 @@ The codegen step happens once (or whenever your context changes). At runtime, `c
 
 ## Comparison
 
-| | **clean-di** | InversifyJS | tsyringe | Awilix | Brandi |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Decorators required | ❌ | ✅ | ✅ | ❌ | ✅ |
-| `reflect-metadata` | ❌ | ✅ | ✅ | ❌ | ❌ |
-| Codegen | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Tree-shakable | ✅ | ❌ | ❌ | ⚠️ | ⚠️ |
-| TypeScript-first | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+|                     | **clean-di** | InversifyJS | tsyringe | Awilix | Brandi |
+| ------------------- | :----------: | :---------: | :------: | :----: | :----: |
+| Decorators required |      ❌      |     ✅      |    ✅    |   ❌   |   ✅   |
+| `reflect-metadata`  |      ❌      |     ✅      |    ✅    |   ❌   |   ❌   |
+| Codegen             |      ✅      |     ❌      |    ❌    |   ❌   |   ❌   |
+| Tree-shakable       |      ✅      |     ❌      |    ❌    |   ⚠️   |   ⚠️   |
+| TypeScript-first    |      ✅      |     ⚠️      |    ⚠️    |   ⚠️   |   ✅   |
 
 > ✅ Yes · ❌ No · ⚠️ Partial
+
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, workflow, and commit conventions.
 
 ## License
 
