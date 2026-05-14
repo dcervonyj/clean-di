@@ -7,13 +7,15 @@ import { createContext } from "clean-di/runtime";
 import { Greeter } from "./Greeter";
 import { Logger } from "./Logger";
 
-export const greeterContext = createContext<GreeterConfig, { greeter: Greeter }>((cfg) => {
-  const prefix = cfg.prefix;
-  const logger = new Logger();
-  const greeter = new Greeter(prefix, logger);
+export const greeterContext = createContext<GreeterConfig, { greeter: Greeter }>(
+  (cfg) => {
+    const prefix = cfg.prefix;
+    const logger = new Logger();
+    const greeter = new Greeter(prefix, logger);
 
-  return {
-    bag: { prefix, logger, greeter },
-    expose: { greeter },
-  };
-});
+    return {
+      bag: { prefix, logger, greeter },
+      expose: { greeter },
+    };
+  },
+);

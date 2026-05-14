@@ -8,14 +8,16 @@ import { BackupLogger } from "./BackupLogger";
 import { MainLogger } from "./MainLogger";
 import { UseCase } from "./UseCase";
 
-export const appContext = createContext<AppConfig, { useCase: UseCase }>((cfg) => {
-  const mode = cfg.mode;
-  const mainLogger = new MainLogger();
-  const backupLogger = new BackupLogger();
-  const useCase = new UseCase(mainLogger);
+export const appContext = createContext<AppConfig, { useCase: UseCase }>(
+  (cfg) => {
+    const mode = cfg.mode;
+    const mainLogger = new MainLogger();
+    const backupLogger = new BackupLogger();
+    const useCase = new UseCase(mainLogger);
 
-  return {
-    bag: { mode, mainLogger, backupLogger, useCase },
-    expose: { useCase },
-  };
-});
+    return {
+      bag: { mode, mainLogger, backupLogger, useCase },
+      expose: { useCase },
+    };
+  },
+);

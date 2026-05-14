@@ -8,28 +8,30 @@ import { Greeter } from "./Greeter";
 import { helperConfig } from "./helperConfig";
 import { Logger } from "./Logger.js";
 
-export const appContext = createContext<void, { greeter: Greeter }>((cfg) => {
-  const logger = new Logger();
-  const greeter = new Greeter(logger);
+export const appContext = createContext<void, { greeter: Greeter }>(
+  (cfg) => {
+    const logger = new Logger();
+    const greeter = new Greeter(logger);
 
-  return {
-    bag: { logger, greeter },
-    expose: { greeter },
-    postConstruct: (cfg) => {
-      (({ logger }: { logger: Logger }) => {
-        logger.log("helper:postConstruct");
-      })({ logger, greeter });
-      (({ greeter }: { greeter: Greeter }) => {
-        greeter.greet("world");
-      })({ logger, greeter });
-    },
-    preDestroy: (cfg) => {
-      (({ greeter }: { greeter: Greeter }) => {
-        greeter.logger.log("app:preDestroy");
-      })({ logger, greeter });
-      (({ logger }: { logger: Logger }) => {
-        logger.log("helper:preDestroy");
-      })({ logger, greeter });
-    },
-  };
-});
+    return {
+      bag: { logger, greeter },
+      expose: { greeter },
+      postConstruct: (cfg) => {
+        (({ logger }: { logger: Logger }) => {
+    logger.log("helper:postConstruct");
+  })({ logger, greeter });
+        (({ greeter }: { greeter: Greeter }) => {
+    greeter.greet("world");
+  })({ logger, greeter });
+      },
+      preDestroy: (cfg) => {
+        (({ greeter }: { greeter: Greeter }) => {
+    greeter.logger.log("app:preDestroy");
+  })({ logger, greeter });
+        (({ logger }: { logger: Logger }) => {
+    logger.log("helper:preDestroy");
+  })({ logger, greeter });
+      },
+    };
+  },
+);

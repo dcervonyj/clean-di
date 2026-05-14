@@ -7,20 +7,20 @@ import { createContext } from "clean-di/runtime";
 import { Greeter } from "./Greeter";
 import { Logger } from "./Logger";
 
-export const greeterContext = createContext<void, { greeter: Greeter }>((cfg) => {
-  const logger = new Logger();
-  const greeter = new Greeter(logger);
+export const greeterContext = createContext<void, { greeter: Greeter }>(
+  (cfg) => {
+    const logger = new Logger();
+    const greeter = new Greeter(logger);
 
-  return {
-    bag: { logger, greeter },
-    expose: { greeter },
-    postConstruct: (cfg) =>
-      (({ greeter }) => {
-        greeter.init();
-      })({ logger, greeter }),
-    preDestroy: (cfg) =>
-      (({ greeter }) => {
-        greeter.dispose();
-      })({ logger, greeter }),
-  };
-});
+    return {
+      bag: { logger, greeter },
+      expose: { greeter },
+      postConstruct: (cfg) => (({ greeter }) => {
+    greeter.init();
+  })({ logger, greeter }),
+      preDestroy: (cfg) => (({ greeter }) => {
+    greeter.dispose();
+  })({ logger, greeter }),
+    };
+  },
+);

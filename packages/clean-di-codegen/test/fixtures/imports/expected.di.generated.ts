@@ -9,13 +9,15 @@ import { commentsConfig } from "./commentsConfig";
 import { HttpCommentsRepository } from "./HttpCommentsRepository.js";
 import { ListCommentsUseCase } from "./ListCommentsUseCase.js";
 
-export const blogContext = createContext<void, { listComments: ListCommentsUseCase }>((cfg) => {
-  const logger = new Logger();
-  const commentsRepository = new HttpCommentsRepository(logger);
-  const listComments = new ListCommentsUseCase(commentsRepository);
+export const blogContext = createContext<void, { listComments: ListCommentsUseCase }>(
+  (cfg) => {
+    const logger = new Logger();
+    const commentsRepository = new HttpCommentsRepository(logger);
+    const listComments = new ListCommentsUseCase(commentsRepository);
 
-  return {
-    bag: { logger, commentsRepository, listComments },
-    expose: { listComments },
-  };
-});
+    return {
+      bag: { logger, commentsRepository, listComments },
+      expose: { listComments },
+    };
+  },
+);
