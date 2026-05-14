@@ -112,7 +112,7 @@ export function collectContexts(parsed: ParsedDiFile): CollectContextsResult {
       exportName: extractExportName(innerCall),
       configTypeName: configType.typeName,
       configType: configType.type,
-      beans: extractBeans(spec),
+      beans: extractBeans(spec, parsed.calls, diagnostics),
       expose: extractExposeList(spec),
       postConstruct: extractHook(spec, "postConstruct"),
       preDestroy: extractHook(spec, "preDestroy"),
@@ -261,8 +261,29 @@ function isExposeArray(expr: ts.Expression): boolean {
   return ts.isArrayLiteralExpression(init);
 }
 
-function extractBeans(spec: ts.ObjectLiteralExpression): readonly BeanDeclaration[] {
+/**
+ * Walk the `beans: { ... }` object literal and collect one `BeanDeclaration`
+ * per entry. The RHS of every entry must be a `bean(...)` or `provide(...)`
+ * call expression — anything else (plain object, class reference, arrow
+ * function, raw call to some other function) is rejected with `CDI-007` and
+ * skipped so the rest of the context can still be emitted.
+ *
+ * Identity is established by cross-referencing `parsed.calls`, which has
+ * already classified every clean-di DSL call site by symbol (so renamed
+ * aliases like `import { bean as b }` still match).
+ */
+function extractBeans(
+  spec: ts.ObjectLiteralExpression,
+  parsedCalls: readonly DiCall[],
+  diagnostics: Diagnostic[],
+): readonly BeanDeclaration[] {
   const beans: BeanDeclaration[] = [];
+  const callKinds = new Map<ts.CallExpression, "bean" | "provide">();
+  for (const call of parsedCalls) {
+    if (call.kind === "bean" || call.kind === "provide") {
+      callKinds.set(call.node, call.kind);
+    }
+  }
 
   for (const prop of spec.properties) {
     if (!ts.isPropertyAssignment(prop)) continue;
@@ -281,14 +302,12 @@ function extractBeans(spec: ts.ObjectLiteralExpression): readonly BeanDeclaratio
 
       const beanName = beanProp.name.text;
       const rhs = beanProp.initializer;
-      if (!ts.isCallExpression(rhs)) continue;
 
-      // We rely on parseDiFile's call list for symbol-identity matching;
-      // here we just record the call and classify by callee identifier text
-      // as a fast heuristic. parseDiFile's `calls` array already filtered
-      // these to `bean` / `provide` so the heuristic is safe in context.
-      const calleeText = rhs.expression.getText();
-      const kind: BeanDeclaration["kind"] = calleeText.startsWith("provide") ? "provide" : "bean";
+      const kind = ts.isCallExpression(rhs) ? callKinds.get(rhs) : undefined;
+      if (kind === undefined) {
+        diagnostics.push(cdi007(rhs, beanName));
+        continue;
+      }
 
       beans.push({ name: beanName, callExpression: rhs, kind });
     }
@@ -364,6 +383,20 @@ function cdi005(node: ts.Node, detail: string): Diagnostic {
     column: character + 1,
     message: `${DEFAULT_MESSAGES["CDI-005"]} ${detail}.`,
     hint: DEFAULT_HINTS["CDI-005"],
+  };
+}
+
+function cdi007(node: ts.Node, beanName: string): Diagnostic {
+  const source = node.getSourceFile();
+  const { line, character } = source.getLineAndCharacterOfPosition(node.getStart());
+
+  return {
+    code: "CDI-007",
+    file: source.fileName,
+    line: line + 1,
+    column: character + 1,
+    message: `${DEFAULT_MESSAGES["CDI-007"]} Bean '${beanName}' RHS must be a bean(...) or provide(...) call.`,
+    hint: DEFAULT_HINTS["CDI-007"],
   };
 }
 

@@ -1,0 +1,17 @@
+[
+  {
+    "code": "CDI-007",
+    "file": "input.di.ts",
+    "messageMatches": "foo"
+  },
+  {
+    "code": "CDI-007",
+    "file": "input.di.ts",
+    "messageMatches": "bar"
+  },
+  {
+    "code": "CDI-007",
+    "file": "input.di.ts",
+    "messageMatches": "baz"
+  }
+]
