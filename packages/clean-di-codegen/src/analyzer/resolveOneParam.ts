@@ -111,6 +111,12 @@ export function resolveOneParam(input: ResolveParamInput): ResolveParamResult {
       if (fallbackType !== undefined && checker.isTypeAssignableTo(fallbackType, paramType)) {
         return { beanName: paramName, skippedAsOptional: false, diagnostics: [] };
       }
+      // For provide() beans whose inner type is degenerate (never/any), accept
+      // by name alone. The user explicitly named the provide() bean to match
+      // this constructor param — that intent is sufficient.
+      if (fallbackEntry.kind === "provide" && fallbackType === undefined) {
+        return { beanName: paramName, skippedAsOptional: false, diagnostics: [] };
+      }
     }
 
     if (isOptional) {
@@ -213,7 +219,10 @@ function resolveByOverride(input: ResolveByOverrideInput): ResolveParamResult {
 /**
  * Resolve the effective type of a bean scope entry:
  *  - For `bean(Class)` → the instance type of the class.
- *  - For `provide(fn)` → the recorded return type.
+ *  - For `provide(fn)` → the inner type T unwrapped from `BeanDef<T>`.
+ *    Returns `undefined` when T is `never` or `any` (degenerate — the provide
+ *    factory didn't carry a meaningful type, usually because `cfg` is typed as
+ *    `never` in the provide signature). These beans resolve by name only.
  *  - For synthetic `"config"` entries (T-046) → the recorded config-field type.
  */
 function getBeanType(
@@ -229,7 +238,18 @@ function getBeanType(
     return undefined;
   }
 
-  // provide(...) or synthetic config — both carry their type on `provideType`.
+  if (entry.kind === "provide") {
+    if (entry.provideType === undefined) return undefined;
+    // Unwrap BeanDef<T> → T so the inner type is used for matching.
+    const typeArgs = checker.getTypeArguments(entry.provideType as ts.TypeReference);
+    if (typeArgs.length === 0) return undefined;
+    const inner = typeArgs[0]!;
+    // Skip degenerate types that would match everything.
+    if (inner.flags & (ts.TypeFlags.Never | ts.TypeFlags.Any)) return undefined;
+    return inner;
+  }
+
+  // Synthetic config entry — provideType IS the actual field type (not BeanDef<T>).
   return entry.provideType;
 }
 

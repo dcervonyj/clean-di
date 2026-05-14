@@ -93,10 +93,10 @@ describe("formatGenerated()", () => {
   it("emits postConstruct field when a single postConstructSource is provided", () => {
     const out = formatGenerated({
       ...baseInput,
-      postConstructSources: ["({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); }"],
+      postConstructSources: [{ src: "({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); }", passCfg: true }],
     });
 
-    // Single hook → inline expression form.
+    // Single hook → inline expression form, cfg passed because passCfg = true.
     expect(out).toContain(
       "postConstruct: (cfg) => (({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg),",
     );
@@ -106,11 +106,12 @@ describe("formatGenerated()", () => {
   it("emits preDestroy field when a single preDestroySource is provided", () => {
     const out = formatGenerated({
       ...baseInput,
-      preDestroySources: ["({ logger }) => { logger.info('bye'); }"],
+      preDestroySources: [{ src: "({ logger }) => { logger.info('bye'); }", passCfg: false }],
     });
 
+    // Single hook → no cfg argument because passCfg = false.
     expect(out).toContain(
-      "preDestroy: (cfg) => (({ logger }) => { logger.info('bye'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg),",
+      "preDestroy: (cfg) => (({ logger }) => { logger.info('bye'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }),",
     );
     expect(out).not.toContain("postConstruct:");
   });
@@ -119,14 +120,14 @@ describe("formatGenerated()", () => {
     const out = formatGenerated({
       ...baseInput,
       postConstructSources: [
-        "({ logger }) => { logger.info('imported init'); }",
-        "({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); }",
+        { src: "({ logger }) => { logger.info('imported init'); }", passCfg: false },
+        { src: "({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); }", passCfg: true },
       ],
     });
 
     // Block form wraps all hooks in a block arrow.
     expect(out).toContain("postConstruct: (cfg) => {");
-    expect(out).toContain("(({ logger }) => { logger.info('imported init'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg);");
+    expect(out).toContain("(({ logger }) => { logger.info('imported init'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts });");
     expect(out).toContain("(({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg);");
     expect(out).not.toContain("preDestroy:");
   });
@@ -135,14 +136,14 @@ describe("formatGenerated()", () => {
     const out = formatGenerated({
       ...baseInput,
       preDestroySources: [
-        "({ logger }) => { logger.info('first destroy'); }",
-        "({ logger }) => { logger.info('second destroy'); }",
+        { src: "({ logger }) => { logger.info('first destroy'); }", passCfg: false },
+        { src: "({ logger }) => { logger.info('second destroy'); }", passCfg: false },
       ],
     });
 
     expect(out).toContain("preDestroy: (cfg) => {");
-    expect(out).toContain("(({ logger }) => { logger.info('first destroy'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg);");
-    expect(out).toContain("(({ logger }) => { logger.info('second destroy'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg);");
+    expect(out).toContain("(({ logger }) => { logger.info('first destroy'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts });");
+    expect(out).toContain("(({ logger }) => { logger.info('second destroy'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts });");
   });
 
   it("emits neither postConstruct nor preDestroy when both arrays are empty", () => {

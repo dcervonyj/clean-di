@@ -248,8 +248,8 @@ describe("emitGeneratedFile() — MVP integration", () => {
     // The user's hook source is emitted verbatim inside the adapter.
     expect(generated).toContain("greeter.init()");
     expect(generated).toContain("greeter.dispose()");
-    // The adapter passes the bag (`{ logger, greeter }`) and `cfg` to the user's hook.
-    expect(generated).toContain("({ logger, greeter }, cfg)");
+    // The hooks have 1 parameter (no cfg), so the bag is passed without cfg.
+    expect(generated).toContain("({ logger, greeter })");
   });
 
   it("re-emits when the generator version changes (hash mismatch)", async () => {

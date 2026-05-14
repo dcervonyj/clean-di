@@ -15,7 +15,7 @@ import { buildBeanScopeWithImports, resolveDefineConfigCall, type BeanScopeEntry
 import { resolveConstructor } from "../analyzer/resolveConstructor.js";
 import { topoSort } from "../analyzer/topoSort.js";
 import { validateExpose } from "../analyzer/validateExpose.js";
-import { formatGenerated, type EmittedBean, type EmittedImport } from "./formatGenerated.js";
+import { formatGenerated, type EmittedBean, type EmittedImport, type HookSource } from "./formatGenerated.js";
 import { hashGeneratedFile } from "./hash.js";
 
 export interface EmitInput {
@@ -193,13 +193,15 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
   const importedHooks = collectImportedLifecycleHooks(checker, context);
 
   // postConstruct order: imported configs depth-first, then parent (DESIGN §5.6).
-  const postConstructSources: string[] = [
+  const postConstructSources: HookSource[] = [
     ...importedHooks.postConstructSources,
-    ...(context.postConstruct !== undefined ? [context.postConstruct.getText()] : []),
+    ...(context.postConstruct !== undefined
+      ? [toHookSource(context.postConstruct)]
+      : []),
   ];
   // preDestroy order: parent first, then imports in LIFO order (DESIGN §5.6).
-  const preDestroySources: string[] = [
-    ...(context.preDestroy !== undefined ? [context.preDestroy.getText()] : []),
+  const preDestroySources: HookSource[] = [
+    ...(context.preDestroy !== undefined ? [toHookSource(context.preDestroy)] : []),
     ...importedHooks.preDestroySources,
   ];
 
@@ -397,8 +399,19 @@ function collectMissingBeanImports(
 }
 
 interface LifecycleHooks {
-  readonly postConstructSources: readonly string[];
-  readonly preDestroySources: readonly string[];
+  readonly postConstructSources: readonly HookSource[];
+  readonly preDestroySources: readonly HookSource[];
+}
+
+/**
+ * Convert a hook AST expression to a `HookSource`, detecting whether the
+ * function accepts a second `cfg` parameter.
+ */
+function toHookSource(expr: ts.Expression): HookSource {
+  const passCfg =
+    (ts.isArrowFunction(expr) || ts.isFunctionExpression(expr)) &&
+    expr.parameters.length >= 2;
+  return { src: expr.getText(), passCfg };
 }
 
 /**
@@ -418,8 +431,8 @@ function collectImportedLifecycleHooks(
   checker: ts.TypeChecker,
   context: ContextDeclaration,
 ): LifecycleHooks {
-  const postConstructSources: string[] = [];
-  const preDestroySources: string[] = [];
+  const postConstructSources: HookSource[] = [];
+  const preDestroySources: HookSource[] = [];
   const visitedConfigs = new Set<ts.CallExpression>();
 
   function walkImportExpr(importExpr: ts.Expression): void {
@@ -437,13 +450,13 @@ function collectImportedLifecycleHooks(
 
     const postConstruct = extractHookFromSpec(spec, "postConstruct");
     if (postConstruct !== undefined) {
-      postConstructSources.push(postConstruct.getText());
+      postConstructSources.push(toHookSource(postConstruct));
     }
 
     const preDestroy = extractHookFromSpec(spec, "preDestroy");
     if (preDestroy !== undefined) {
       // Collect in same order as postConstruct; reverse at the end.
-      preDestroySources.push(preDestroy.getText());
+      preDestroySources.push(toHookSource(preDestroy));
     }
   }
 

@@ -19,18 +19,18 @@ export const appContext = createContext<void, { greeter: Greeter }>(
       postConstruct: (cfg) => {
         (({ logger }: { logger: Logger }) => {
     logger.log("helper:postConstruct");
-  })({ logger, greeter }, cfg);
+  })({ logger, greeter });
         (({ greeter }: { greeter: Greeter }) => {
     greeter.greet("world");
-  })({ logger, greeter }, cfg);
+  })({ logger, greeter });
       },
       preDestroy: (cfg) => {
         (({ greeter }: { greeter: Greeter }) => {
     greeter.logger.log("app:preDestroy");
-  })({ logger, greeter }, cfg);
+  })({ logger, greeter });
         (({ logger }: { logger: Logger }) => {
     logger.log("helper:preDestroy");
-  })({ logger, greeter }, cfg);
+  })({ logger, greeter });
       },
     };
   },

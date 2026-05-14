@@ -8,7 +8,7 @@ declare const console: { warn(message: string): void };
 const SINGLETON_KEY = Symbol("clean-di:singleton");
 
 export function createContext<TConfig, TExposed>(
-  builder: (config: TConfig) => BuildResult<TExposed>,
+  builder: (config: TConfig) => BuildResult<TExposed, TConfig>,
 ): Container<TConfig, TExposed> {
   const cache = new Map<unknown, CachedInstance<TExposed>>();
   const destroyedKeys = new Set<unknown>();
@@ -29,7 +29,7 @@ export function createContext<TConfig, TExposed>(
     const result = builder(config);
     const entry: CachedInstance<TExposed> = {
       exposed: result.expose,
-      preDestroy: result.preDestroy,
+      preDestroy: result.preDestroy as ((config: unknown) => void) | undefined,
       config,
     };
     cache.set(key, entry);

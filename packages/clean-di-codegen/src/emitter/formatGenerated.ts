@@ -37,6 +37,17 @@ export interface EmittedBean {
 }
 
 /**
+ * A single lifecycle hook to emit.
+ * `src` is the hook's source text (re-printed verbatim from the `.di.ts`).
+ * `passCfg` is `true` when the hook function accepts a second `cfg` parameter —
+ * only then do we pass `cfg` in the IIFE call to avoid TS2554.
+ */
+export interface HookSource {
+  readonly src: string;
+  readonly passCfg: boolean;
+}
+
+/**
  * Everything `formatGenerated` needs to render a `.di.generated.ts` file.
  *
  * The orchestrator (T-042) assembles this from the analyzer outputs, then
@@ -68,17 +79,17 @@ export interface FormatGeneratedInput {
   /** Header template (defaults to `DEFAULT_HEADER` from `config/defaultConfig.ts`). */
   readonly headerTemplate: string;
   /**
-   * Source texts of all postConstruct hooks to call, in order:
+   * Source texts and arity flags of all postConstruct hooks to call, in order:
    * imported configs first (depth-first), then the top-level context's hook.
    * Empty array = no postConstruct emitted.
    */
-  readonly postConstructSources: readonly string[];
+  readonly postConstructSources: readonly HookSource[];
   /**
-   * Source texts of all preDestroy hooks to call, in order:
+   * Source texts and arity flags of all preDestroy hooks to call, in order:
    * top-level context first, then imported configs in LIFO order.
    * Empty array = no preDestroy emitted.
    */
-  readonly preDestroySources: readonly string[];
+  readonly preDestroySources: readonly HookSource[];
 }
 
 /**
@@ -148,33 +159,36 @@ function renderImport(imp: EmittedImport): string {
 
 /**
  * Render the optional `postConstruct` / `preDestroy` fields for the BuildResult
- * literal. Each hook is authored as `(beans, cfg) => ...`; we wrap it in a
+ * literal. Each hook is authored as `(beans, cfg?) => ...`; we wrap it in a
  * thin adapter that supplies the locally-built bean bag.
  *
- * Single hook  → inline expression form: `postConstruct: (cfg) => (<hook>)({...}, cfg),`
+ * Single hook  → inline expression form: `postConstruct: (cfg) => (<hook>)({...}[, cfg]),`
  * Multiple hooks → block form: calls each hook in sequence inside a block arrow.
  */
 function renderHookLines(input: FormatGeneratedInput, bagFields: string): readonly string[] {
   const lines: string[] = [];
 
+  const hookCall = (hook: HookSource): string => {
+    const cfgArg = hook.passCfg ? ", cfg" : "";
+    return `(${hook.src})({ ${bagFields} }${cfgArg})`;
+  };
+
   if (input.postConstructSources.length === 1) {
-    lines.push(
-      `      postConstruct: (cfg) => (${input.postConstructSources[0]!})({ ${bagFields} }, cfg),`,
-    );
+    lines.push(`      postConstruct: (cfg) => ${hookCall(input.postConstructSources[0]!)},`);
   } else if (input.postConstructSources.length > 1) {
     lines.push(`      postConstruct: (cfg) => {`);
-    for (const src of input.postConstructSources) {
-      lines.push(`        (${src})({ ${bagFields} }, cfg);`);
+    for (const hook of input.postConstructSources) {
+      lines.push(`        ${hookCall(hook)};`);
     }
     lines.push(`      },`);
   }
 
   if (input.preDestroySources.length === 1) {
-    lines.push(`      preDestroy: (cfg) => (${input.preDestroySources[0]!})({ ${bagFields} }, cfg),`);
+    lines.push(`      preDestroy: (cfg) => ${hookCall(input.preDestroySources[0]!)},`);
   } else if (input.preDestroySources.length > 1) {
     lines.push(`      preDestroy: (cfg) => {`);
-    for (const src of input.preDestroySources) {
-      lines.push(`        (${src})({ ${bagFields} }, cfg);`);
+    for (const hook of input.preDestroySources) {
+      lines.push(`        ${hookCall(hook)};`);
     }
     lines.push(`      },`);
   }

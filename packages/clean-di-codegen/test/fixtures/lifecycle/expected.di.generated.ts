@@ -17,10 +17,10 @@ export const greeterContext = createContext<void, { greeter: Greeter }>(
       expose: { greeter },
       postConstruct: (cfg) => (({ greeter }) => {
     greeter.init();
-  })({ logger, greeter }, cfg),
+  })({ logger, greeter }),
       preDestroy: (cfg) => (({ greeter }) => {
     greeter.dispose();
-  })({ logger, greeter }, cfg),
+  })({ logger, greeter }),
     };
   },
 );
