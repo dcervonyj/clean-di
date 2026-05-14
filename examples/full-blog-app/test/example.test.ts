@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { blogContext } from "../src/blog/BlogContext.di.generated.js";
+
 import type { BlogConfig } from "../src/blog/BlogConfig.js";
-import { ListPostsUseCase } from "../src/blog/posts/ListPostsUseCase.js";
+import { blogContext } from "../src/blog/BlogContext.di.generated.js";
 import { ListCommentsUseCase } from "../src/blog/comments/ListCommentsUseCase.js";
+import { ListPostsUseCase } from "../src/blog/posts/ListPostsUseCase.js";
 import { GetCurrentUserUseCase } from "../src/blog/users/GetCurrentUserUseCase.js";
 
 // ---------------------------------------------------------------------------

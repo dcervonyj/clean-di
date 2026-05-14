@@ -1,21 +1,30 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, basename, relative } from "node:path";
 
-import ts from "typescript";
+import * as ts from "typescript";
 
-import type { Diagnostic } from "../diagnostics/codes.js";
-import type { DiagnosticReporter } from "../diagnostics/report.js";
-import { DEFAULT_HEADER } from "../config/defaultConfig.js";
-
-import { parseDiFile } from "../analyzer/parseDiFile.js";
+import {
+  buildBeanScopeWithImports,
+  resolveDefineConfigCall,
+  type BeanScopeEntry,
+} from "../analyzer/buildBeanScope.js";
 import { collectContexts } from "../analyzer/collectContexts.js";
 import type { ContextDeclaration } from "../analyzer/collectContexts.js";
-import { buildBeanScopeWithImports, resolveDefineConfigCall, type BeanScopeEntry } from "../analyzer/buildBeanScope.js";
+import { parseDiFile } from "../analyzer/parseDiFile.js";
 import { resolveConstructor } from "../analyzer/resolveConstructor.js";
 import { topoSort } from "../analyzer/topoSort.js";
 import { validateExpose } from "../analyzer/validateExpose.js";
-import { formatGenerated, type EmittedBean, type EmittedImport, type HookSource } from "./formatGenerated.js";
+import { DEFAULT_HEADER } from "../config/defaultConfig.js";
+import type { Diagnostic } from "../diagnostics/codes.js";
+import type { DiagnosticReporter } from "../diagnostics/report.js";
+
+import {
+  formatGenerated,
+  type EmittedBean,
+  type EmittedImport,
+  type HookSource,
+} from "./formatGenerated.js";
 import { hashGeneratedFile } from "./hash.js";
 
 export interface EmitInput {
@@ -195,9 +204,7 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
   // postConstruct order: imported configs depth-first, then parent (DESIGN §5.6).
   const postConstructSources: HookSource[] = [
     ...importedHooks.postConstructSources,
-    ...(context.postConstruct !== undefined
-      ? [toHookSource(context.postConstruct)]
-      : []),
+    ...(context.postConstruct !== undefined ? [toHookSource(context.postConstruct)] : []),
   ];
   // preDestroy order: parent first, then imports in LIFO order (DESIGN §5.6).
   const preDestroySources: HookSource[] = [
@@ -409,8 +416,7 @@ interface LifecycleHooks {
  */
 function toHookSource(expr: ts.Expression): HookSource {
   const passCfg =
-    (ts.isArrowFunction(expr) || ts.isFunctionExpression(expr)) &&
-    expr.parameters.length >= 2;
+    (ts.isArrowFunction(expr) || ts.isFunctionExpression(expr)) && expr.parameters.length >= 2;
   return { src: expr.getText(), passCfg };
 }
 

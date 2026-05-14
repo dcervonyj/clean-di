@@ -1,4 +1,4 @@
-import { Logger } from "./Logger.js";
+import type { Logger } from "./Logger.js";
 
 export class Greeter {
   constructor(

@@ -1,4 +1,4 @@
-import { HttpUsersRepository } from "./HttpUsersRepository.js";
+import type { HttpUsersRepository } from "./HttpUsersRepository.js";
 import type { User } from "./User.js";
 
 export class GetCurrentUserUseCase {

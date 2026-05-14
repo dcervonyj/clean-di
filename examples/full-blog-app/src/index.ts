@@ -5,8 +5,8 @@
  * the example runs in any environment — CI included.
  */
 
-import { blogContext } from "./blog/BlogContext.di.generated.js";
 import type { BlogConfig } from "./blog/BlogConfig.js";
+import { blogContext } from "./blog/BlogContext.di.generated.js";
 
 // ---------------------------------------------------------------------------
 // Mock fetch — replace global fetch with a minimal stub that returns canned data.

@@ -1,5 +1,5 @@
-import type { BuildResult } from "./buildResult.js";
 import type { CachedInstance, Container } from "./Container.js";
+import type { BuildResult } from "./buildResult.js";
 
 // Locally typed `console` — clean-di is framework-agnostic core (no DOM, no Node
 // types pulled in). `console.warn` is universally available in every JS runtime.

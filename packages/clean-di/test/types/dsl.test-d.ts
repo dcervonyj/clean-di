@@ -8,8 +8,9 @@
  * (per T-028 AC). If the file compiles, the assertions hold.
  */
 
-import { describe, it } from "vitest";
 import { expectTypeOf } from "expect-type";
+import { describe, it } from "vitest";
+
 import { bean, defineContext, provide } from "../../src";
 
 class Logger {

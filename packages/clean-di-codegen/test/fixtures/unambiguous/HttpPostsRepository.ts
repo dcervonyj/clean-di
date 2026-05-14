@@ -1,4 +1,4 @@
-import { Logger } from "./Logger";
+import type { Logger } from "./Logger";
 
 export class HttpPostsRepository {
   private readonly tag = "repo";

@@ -2,8 +2,8 @@ import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import * as ts from "typescript";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import ts from "typescript";
 
 import { DiagnosticReporter } from "../../src/diagnostics/report";
 import { emitGeneratedFile } from "../../src/emitter/emitGeneratedFile";
@@ -313,7 +313,12 @@ describe("emitGeneratedFile() — MVP integration", () => {
     });
 
     const reporter = new DiagnosticReporter(() => {}, false);
-    const result = await emitGeneratedFile({ sourcePath, program, reporter, generatorVersion: "1.0.0" });
+    const result = await emitGeneratedFile({
+      sourcePath,
+      program,
+      reporter,
+      generatorVersion: "1.0.0",
+    });
 
     expect(result.wrote).toBe(true);
     expect(result.diagnostics).toHaveLength(0);
@@ -350,7 +355,12 @@ describe("emitGeneratedFile() — MVP integration", () => {
     });
 
     const reporter = new DiagnosticReporter(() => {}, false);
-    const result = await emitGeneratedFile({ sourcePath, program, reporter, generatorVersion: "1.0.0" });
+    const result = await emitGeneratedFile({
+      sourcePath,
+      program,
+      reporter,
+      generatorVersion: "1.0.0",
+    });
 
     expect(result.wrote).toBe(true);
     expect(result.diagnostics).toHaveLength(0);

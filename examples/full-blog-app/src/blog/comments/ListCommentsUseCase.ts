@@ -1,5 +1,5 @@
-import { HttpCommentsRepository } from "./HttpCommentsRepository.js";
 import type { Comment } from "./Comment.js";
+import type { HttpCommentsRepository } from "./HttpCommentsRepository.js";
 
 export class ListCommentsUseCase {
   constructor(private readonly repo: HttpCommentsRepository) {}

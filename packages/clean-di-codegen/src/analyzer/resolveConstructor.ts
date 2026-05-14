@@ -1,6 +1,7 @@
-import ts from "typescript";
+import * as ts from "typescript";
 
 import type { Diagnostic } from "../diagnostics/codes.js";
+
 import type { BeanScope, BeanScopeEntry } from "./buildBeanScope.js";
 import { resolveOneParam } from "./resolveOneParam.js";
 

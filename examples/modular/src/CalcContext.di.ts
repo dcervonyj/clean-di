@@ -1,8 +1,8 @@
 import { defineContext, bean, type Container } from "clean-di";
 
+import { Calculator } from "./Calculator.js";
 import type { MathConfig } from "./MathConfig.js";
 import { mathConfig } from "./mathConfig.di.js";
-import { Calculator } from "./Calculator.js";
 
 // Top-level context that pulls in mathConfig as a sub-module.
 // `adder` and `multiplier` beans come from mathConfig automatically.

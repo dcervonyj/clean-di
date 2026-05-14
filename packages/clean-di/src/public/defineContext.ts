@@ -1,4 +1,5 @@
 import type { Container } from "../runtime/Container.js";
+
 import type { Beans, ContextSpec, ExposedOf } from "./types.js";
 
 /**

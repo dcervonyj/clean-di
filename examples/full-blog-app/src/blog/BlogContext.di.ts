@@ -1,11 +1,12 @@
 import { defineContext, bean, provide } from "clean-di";
 
-import type { BlogConfig } from "./BlogConfig.js";
 import { Logger } from "../shared/Logger.js";
+
+import type { BlogConfig } from "./BlogConfig.js";
+import { commentsConfig } from "./comments/CommentsConfig.di.js";
+import { CreatePostUseCase } from "./posts/CreatePostUseCase.js";
 import { HttpPostsRepository } from "./posts/HttpPostsRepository.js";
 import { ListPostsUseCase } from "./posts/ListPostsUseCase.js";
-import { CreatePostUseCase } from "./posts/CreatePostUseCase.js";
-import { commentsConfig } from "./comments/CommentsConfig.di.js";
 import { usersConfig } from "./users/UsersConfig.di.js";
 
 export type { BlogConfig };
@@ -24,11 +25,5 @@ export const blogContext = defineContext<BlogConfig>()({
   },
   postConstruct: ({ logger }, cfg) => logger.info(`blog ready — ${cfg.apiBaseUrl}`),
   preDestroy: ({ logger }, _cfg) => logger.info("blog destroyed"),
-  expose: [
-    "listPosts",
-    "createPost",
-    "listComments",
-    "deleteComment",
-    "getCurrentUser",
-  ],
+  expose: ["listPosts", "createPost", "listComments", "deleteComment", "getCurrentUser"],
 });

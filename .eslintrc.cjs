@@ -21,6 +21,15 @@ module.exports = {
     "@typescript-eslint/no-explicit-any": "error",
     "@typescript-eslint/consistent-type-imports": "error",
     "@typescript-eslint/no-floating-promises": "off",
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        vars: "all",
+        varsIgnorePattern: "^_",
+        args: "after-used",
+        argsIgnorePattern: "^_",
+      },
+    ],
     "prefer-const": "error",
     "no-var": "error",
     "unused-imports/no-unused-imports": "error",

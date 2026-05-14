@@ -2,7 +2,7 @@ import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import ts from "typescript";
+import * as ts from "typescript";
 
 import type { Diagnostic } from "../../src/diagnostics/codes";
 
@@ -115,7 +115,11 @@ async function copyTreeShallow(src: string, dst: string): Promise<void> {
     if (st.isDirectory()) {
       await mkdir(fullDst, { recursive: true });
       await copyTreeShallow(fullSrc, fullDst);
-    } else if (st.isFile() && entry !== "expected-diagnostics.json" && entry !== "expected.di.generated.ts") {
+    } else if (
+      st.isFile() &&
+      entry !== "expected-diagnostics.json" &&
+      entry !== "expected.di.generated.ts"
+    ) {
       await copyFile(fullSrc, fullDst);
     }
   }

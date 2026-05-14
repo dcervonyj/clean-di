@@ -1,9 +1,12 @@
 import { describe, it, expect, afterEach } from "vitest";
+
 import { calcContext } from "../src/CalcContext.di.generated.js";
 import { Calculator } from "../src/Calculator.js";
 
 describe("examples/modular — calcContext", () => {
-  afterEach(() => { calcContext.destroyAll(); });
+  afterEach(() => {
+    calcContext.destroyAll();
+  });
 
   it("resolves the calculator bean", () => {
     const { calculator } = calcContext.get({ config: { precision: 2 }, key: "t1" });

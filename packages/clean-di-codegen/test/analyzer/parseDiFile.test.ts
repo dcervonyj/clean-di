@@ -2,8 +2,8 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import ts from "typescript";
+import * as ts from "typescript";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { parseDiFile } from "../../src/analyzer/parseDiFile";
 

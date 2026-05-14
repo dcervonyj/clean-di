@@ -1,5 +1,5 @@
-import { readFile, access } from "node:fs/promises";
 import { constants as FS_CONSTANTS } from "node:fs";
+import { readFile, access } from "node:fs/promises";
 import { resolve as pathResolve, join as pathJoin } from "node:path";
 
 import { createJiti } from "jiti";

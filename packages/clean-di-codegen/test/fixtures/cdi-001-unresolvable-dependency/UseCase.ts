@@ -1,5 +1,5 @@
-import { Logger } from "./Logger";
-import { Database } from "./Database";
+import type { Database } from "./Database";
+import type { Logger } from "./Logger";
 
 export class UseCase {
   private readonly tag = "use-case";

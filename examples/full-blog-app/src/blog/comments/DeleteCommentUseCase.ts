@@ -1,4 +1,4 @@
-import { HttpCommentsRepository } from "./HttpCommentsRepository.js";
+import type { HttpCommentsRepository } from "./HttpCommentsRepository.js";
 
 export class DeleteCommentUseCase {
   constructor(private readonly repo: HttpCommentsRepository) {}

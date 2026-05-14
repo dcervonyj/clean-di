@@ -1,4 +1,5 @@
-import { Logger } from "../../shared/Logger.js";
+import type { Logger } from "../../shared/Logger.js";
+
 import type { User } from "./User.js";
 
 export class HttpUsersRepository {

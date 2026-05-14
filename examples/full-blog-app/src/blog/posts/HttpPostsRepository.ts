@@ -1,4 +1,5 @@
-import { Logger } from "../../shared/Logger.js";
+import type { Logger } from "../../shared/Logger.js";
+
 import type { Post } from "./Post.js";
 
 export class HttpPostsRepository {

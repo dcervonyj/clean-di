@@ -1,4 +1,4 @@
-import { HttpCommentsRepository } from "./HttpCommentsRepository";
+import type { HttpCommentsRepository } from "./HttpCommentsRepository";
 
 export class ListCommentsUseCase {
   private readonly tag = "list-comments";

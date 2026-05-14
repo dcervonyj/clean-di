@@ -1,4 +1,5 @@
-import { Logger } from "../../shared/Logger.js";
+import type { Logger } from "../../shared/Logger.js";
+
 import type { Comment } from "./Comment.js";
 
 export class HttpCommentsRepository {

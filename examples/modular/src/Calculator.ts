@@ -1,5 +1,5 @@
-import { Adder } from "./Adder.js";
-import { Multiplier } from "./Multiplier.js";
+import type { Adder } from "./Adder.js";
+import type { Multiplier } from "./Multiplier.js";
 
 export class Calculator {
   private readonly _adder: Adder;

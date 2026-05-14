@@ -1,7 +1,7 @@
 import { defineContext, bean } from "clean-di";
 
-import { Logger } from "./Logger";
 import { Greeter } from "./Greeter";
+import { Logger } from "./Logger";
 
 export const greeterContext = defineContext()({
   beans: {

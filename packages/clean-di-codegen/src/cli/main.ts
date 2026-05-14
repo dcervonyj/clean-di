@@ -1,6 +1,6 @@
 import { dirname, resolve as pathResolve } from "node:path";
 
-import ts from "typescript";
+import * as ts from "typescript";
 
 import type { ResolvedCleanDiConfig } from "../config/defaultConfig.js";
 import { loadConfig } from "../config/loadConfig.js";

@@ -1,4 +1,4 @@
-import { HttpPostsRepository } from "./HttpPostsRepository.js";
+import type { HttpPostsRepository } from "./HttpPostsRepository.js";
 import type { Post } from "./Post.js";
 
 export class ListPostsUseCase {

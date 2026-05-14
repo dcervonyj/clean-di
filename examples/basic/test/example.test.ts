@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { greeterContext } from "../src/GreeterContext.di.generated.js";
+
 import { Greeter } from "../src/Greeter.js";
+import { greeterContext } from "../src/GreeterContext.di.generated.js";
 
 describe("examples/basic — greeterContext", () => {
-  afterEach(() => { greeterContext.destroyAll(); });
+  afterEach(() => {
+    greeterContext.destroyAll();
+  });
 
   it("resolves the greeter bean with the configured name", () => {
     const { greeter } = greeterContext.get({ config: { name: "World" }, key: "t1" });

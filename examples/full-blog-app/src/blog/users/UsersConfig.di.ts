@@ -1,7 +1,7 @@
 import { defineConfig, bean } from "clean-di";
 
-import { HttpUsersRepository } from "./HttpUsersRepository.js";
 import { GetCurrentUserUseCase } from "./GetCurrentUserUseCase.js";
+import { HttpUsersRepository } from "./HttpUsersRepository.js";
 
 export const usersConfig = defineConfig({
   beans: {

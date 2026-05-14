@@ -10,15 +10,13 @@ import { Logger } from "./Logger.js";
 import { ServiceA } from "./ServiceA.js";
 import { ServiceB } from "./ServiceB.js";
 
-export const appContext = createContext<void, { serviceA: ServiceA, serviceB: ServiceB }>(
-  (cfg) => {
-    const logger = new Logger();
-    const serviceA = new ServiceA(logger);
-    const serviceB = new ServiceB(logger);
+export const appContext = createContext<void, { serviceA: ServiceA; serviceB: ServiceB }>((cfg) => {
+  const logger = new Logger();
+  const serviceA = new ServiceA(logger);
+  const serviceB = new ServiceB(logger);
 
-    return {
-      bag: { logger, serviceA, serviceB },
-      expose: { serviceA, serviceB },
-    };
-  },
-);
+  return {
+    bag: { logger, serviceA, serviceB },
+    expose: { serviceA, serviceB },
+  };
+});
