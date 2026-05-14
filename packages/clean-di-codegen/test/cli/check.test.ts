@@ -40,6 +40,7 @@ describe("runCheck", () => {
     cleanups.length = 0;
   });
 
+  // TypeScript program construction is slow on CI; 15 s avoids flaky timeouts.
   it("returns exitCode 0 when generated file is up-to-date", async () => {
     const layout = await loadFixture(UNAMBIGUOUS_FIXTURE);
     cleanups.push(layout.cleanup);
@@ -61,7 +62,7 @@ describe("runCheck", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.staleFiles).toHaveLength(0);
-  });
+  }, 15_000);
 
   it("returns exitCode 1 when generated file is missing", async () => {
     const layout = await loadFixture(UNAMBIGUOUS_FIXTURE);
