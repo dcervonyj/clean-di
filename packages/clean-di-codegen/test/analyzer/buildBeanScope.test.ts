@@ -5,7 +5,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import ts from "typescript";
 
-import { buildBeanScope } from "../../src/analyzer/buildBeanScope";
+import {
+  buildBeanScope,
+  buildBeanScopeWithImports,
+} from "../../src/analyzer/buildBeanScope";
 import { collectContexts } from "../../src/analyzer/collectContexts";
 import { parseDiFile } from "../../src/analyzer/parseDiFile";
 
@@ -194,5 +197,155 @@ describe("buildBeanScope() — MVP, locals only", () => {
     const scope = buildBeanScope(program.getTypeChecker(), ctx);
 
     expect(Array.from(scope.keys())).toEqual(["c", "a", "b"]);
+  });
+});
+
+describe("buildBeanScopeWithImports() — imports resolution (CDI-006, CDI-010)", () => {
+  let cleanupFn: (() => Promise<void>) | null = null;
+  afterEach(async () => {
+    if (cleanupFn !== null) await cleanupFn();
+    cleanupFn = null;
+  });
+
+  it("merges single-level imported beans into scope", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, defineConfig, bean } from "clean-di";
+       class Logger {}
+       class Repo { constructor(public logger: Logger) {} }
+       export const childConfig = defineConfig({
+         beans: {
+           logger: bean(Logger),
+           repo: bean(Repo),
+         },
+       });
+       export const ctx = defineContext()({
+         imports: [childConfig],
+         beans: {},
+         expose: ["repo"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed).find((c) => c.exportName === "ctx")!;
+    const { scope, diagnostics } = buildBeanScopeWithImports(program.getTypeChecker(), ctx);
+
+    expect(diagnostics).toEqual([]);
+    expect(Array.from(scope.keys())).toEqual(["logger", "repo"]);
+    expect(scope.get("logger")!.imported).toBe(true);
+    expect(scope.get("repo")!.imported).toBe(true);
+  });
+
+  it("merges transitively imported beans", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, defineConfig, bean } from "clean-di";
+       class A {}
+       class B {}
+       class C {}
+       export const innerConfig = defineConfig({
+         beans: { a: bean(A) },
+       });
+       export const middleConfig = defineConfig({
+         imports: [innerConfig],
+         beans: { b: bean(B) },
+       });
+       export const ctx = defineContext()({
+         imports: [middleConfig],
+         beans: { c: bean(C) },
+         expose: ["c"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed).find((c) => c.exportName === "ctx")!;
+    const { scope, diagnostics } = buildBeanScopeWithImports(program.getTypeChecker(), ctx);
+
+    expect(diagnostics).toEqual([]);
+    expect(Array.from(scope.keys())).toEqual(["a", "b", "c"]);
+    expect(scope.get("a")!.imported).toBe(true);
+    expect(scope.get("b")!.imported).toBe(true);
+    expect(scope.get("c")!.imported).toBe(false);
+  });
+
+  it("deduplicates diamond imports by defineConfig identity", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, defineConfig, bean } from "clean-di";
+       class Shared {}
+       class LeftOnly {}
+       class RightOnly {}
+       export const sharedConfig = defineConfig({
+         beans: { shared: bean(Shared) },
+       });
+       export const leftConfig = defineConfig({
+         imports: [sharedConfig],
+         beans: { leftOnly: bean(LeftOnly) },
+       });
+       export const rightConfig = defineConfig({
+         imports: [sharedConfig],
+         beans: { rightOnly: bean(RightOnly) },
+       });
+       export const ctx = defineContext()({
+         imports: [leftConfig, rightConfig],
+         beans: {},
+         expose: ["shared"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed).find((c) => c.exportName === "ctx")!;
+    const { scope, diagnostics } = buildBeanScopeWithImports(program.getTypeChecker(), ctx);
+
+    expect(diagnostics).toEqual([]);
+    // `shared` appears exactly once even though sharedConfig is reached twice.
+    expect(Array.from(scope.keys())).toEqual(["shared", "leftOnly", "rightOnly"]);
+  });
+
+  it("emits CDI-006 on name collision between local and imported", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, defineConfig, bean } from "clean-di";
+       class Foo {}
+       class OtherFoo {}
+       export const fooConfig = defineConfig({
+         beans: { foo: bean(Foo) },
+       });
+       export const ctx = defineContext()({
+         imports: [fooConfig],
+         beans: {
+           foo: bean(OtherFoo),
+         },
+         expose: ["foo"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed).find((c) => c.exportName === "ctx")!;
+    const { diagnostics } = buildBeanScopeWithImports(program.getTypeChecker(), ctx);
+
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe("CDI-006");
+    expect(diagnostics[0]!.message).toContain("foo");
+  });
+
+  it("emits CDI-010 when imports entry is not a defineConfig", async () => {
+    const { program, filePath, cleanup } = await buildFixture(
+      `import { defineContext, bean } from "clean-di";
+       class Foo {}
+       export const ctx = defineContext()({
+         imports: [{ beans: {} }],
+         beans: { foo: bean(Foo) },
+         expose: ["foo"] as const,
+       });`,
+    );
+    cleanupFn = cleanup;
+
+    const parsed = parseDiFile(program, filePath);
+    const ctx = collectContexts(parsed).find((c) => c.exportName === "ctx")!;
+    const { diagnostics } = buildBeanScopeWithImports(program.getTypeChecker(), ctx);
+
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe("CDI-010");
   });
 });

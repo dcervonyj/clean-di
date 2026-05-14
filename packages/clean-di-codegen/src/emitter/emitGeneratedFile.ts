@@ -10,7 +10,10 @@ import { DEFAULT_HEADER } from "../config/defaultConfig.js";
 
 import { parseDiFile } from "../analyzer/parseDiFile.js";
 import { collectContexts } from "../analyzer/collectContexts.js";
-import { buildBeanScope, type BeanScopeEntry } from "../analyzer/buildBeanScope.js";
+import {
+  buildBeanScopeWithImports,
+  type BeanScopeEntry,
+} from "../analyzer/buildBeanScope.js";
 import { resolveConstructor } from "../analyzer/resolveConstructor.js";
 import { topoSort } from "../analyzer/topoSort.js";
 import { formatGenerated, type EmittedBean, type EmittedImport } from "./formatGenerated.js";
@@ -41,7 +44,7 @@ export interface RunResult {
  *
  * Pipeline:
  *   1. parseDiFile → 2. collectContexts → 3. for each context:
- *     a. buildBeanScope → b. resolveConstructor per bean → c. topoSort →
+ *     a. buildBeanScopeWithImports → b. resolveConstructor per bean → c. topoSort →
  *     d. formatGenerated → write
  *
  * Returns `wrote: false` if the hash matches the existing file (DESIGN §7.9).
@@ -61,10 +64,13 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
 
   // W3 MVP supports a single context per file. Take the first.
   const context = contexts[0]!;
-  const localScope = buildBeanScope(checker, context);
+  const { scope: localScope, diagnostics: scopeDiagnostics } = buildBeanScopeWithImports(
+    checker,
+    context,
+  );
 
   // 3b: resolve each bean's constructor.
-  const allDiagnostics: Diagnostic[] = [];
+  const allDiagnostics: Diagnostic[] = [...scopeDiagnostics];
   const resolvedArgs = new Map<string, readonly (string | null)[]>();
   const constructorSigSnapshot: string[] = [];
 
