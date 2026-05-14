@@ -34,7 +34,9 @@ describe("DSL type surface (T-028)", () => {
 
     // The exposed shape is { logger: Logger, counter: Counter } — TBeans was
     // inferred from the spec literal (no manual generic argument needed).
-    expectTypeOf(ctx.get({ config: { name: "x" } })).toEqualTypeOf<{
+    // Use ReturnType to keep this purely type-level — calling ctx.get at
+    // runtime would trip the pre-codegen fail-loud guard in defineContext.
+    expectTypeOf<ReturnType<typeof ctx.get>>().toEqualTypeOf<{
       logger: Logger;
       counter: Counter;
     }>();
@@ -77,11 +79,13 @@ describe("DSL type surface (T-028)", () => {
     });
 
     // `privateThing` and `counter` are stripped by ExposedOf — the bag exposes
-    // only `logger`.
-    expectTypeOf(ctx.get({})).toEqualTypeOf<{ logger: Logger }>();
+    // only `logger`. Type-only check (no runtime call on ctx.get).
+    type Exposed = ReturnType<typeof ctx.get>;
+    expectTypeOf<Exposed>().toEqualTypeOf<{ logger: Logger }>();
 
     // And the narrowed key set means `privateThing` is not accessible:
-    // @ts-expect-error — privateThing must not be on the exposed surface
-    ctx.get({}).privateThing;
+    type _NoPrivateThing =
+      // @ts-expect-error — privateThing must not be on the exposed surface
+      Exposed["privateThing"];
   });
 });
