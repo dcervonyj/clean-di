@@ -53,6 +53,30 @@ export function resolveOneParam(input: ResolveParamInput): ResolveParamResult {
   const paramType = checker.getTypeAtLocation(param);
   const position = getParamPosition(param);
 
+  // DESIGN §7.4 — refuse to auto-wire `any` / `never` parameters. `any` would
+  // silently match every bean in scope (footgun); `never` is uninhabited and
+  // cannot meaningfully be satisfied. Emit CDI-002 either way and point the
+  // user at an explicit override.
+  if (
+    (paramType.flags & ts.TypeFlags.Any) !== 0 ||
+    (paramType.flags & ts.TypeFlags.Never) !== 0
+  ) {
+    return {
+      beanName: null,
+      skippedAsOptional: false,
+      diagnostics: [
+        {
+          code: "CDI-002",
+          file: position.file,
+          line: position.line,
+          column: position.column,
+          message: `AmbiguousDependency: parameter "${paramName}" has type "${checker.typeToString(paramType)}" — clean-di refuses to auto-wire any/never to avoid silently matching every bean.`,
+          hint: `Give the parameter a specific type, or use \`bean(Class, { ${paramName}: "<beanName>" })\` to pin it explicitly.`,
+        },
+      ],
+    };
+  }
+
   // Step 3a — explicit override wins over type matching.
   const overrideTarget = ownerEntry?.overrides[paramName];
   if (overrideTarget !== undefined) {
