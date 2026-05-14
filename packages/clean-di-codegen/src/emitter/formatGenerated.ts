@@ -59,6 +59,12 @@ export interface FormatGeneratedInput {
   readonly beansInTopoOrder: readonly EmittedBean[];
   /** The exposed-keys whitelist from the context's `expose: [...]` list. */
   readonly exposedKeys: readonly string[];
+  /**
+   * Map from exposed key to its TypeScript type name (e.g. `"Greeter"`).
+   * Populated for `bean(Class)` entries; falls back to `"unknown"` for
+   * `provide(...)` / synthetic config beans.
+   */
+  readonly exposedTypes: ReadonlyMap<string, string>;
   /** Header template (defaults to `DEFAULT_HEADER` from `config/defaultConfig.ts`). */
   readonly headerTemplate: string;
   /**
@@ -181,8 +187,9 @@ function renderExposedTypeAnnotation(input: FormatGeneratedInput): string {
     return "{}";
   }
 
-  // W3 MVP: emit `unknown` placeholders. W4 will replace these with the
-  // resolved class names once the analyzer wires up class symbols. The
-  // `createContext` second generic is structural, so this still type-checks.
-  return "{ " + input.exposedKeys.map((k) => `${k}: unknown`).join(", ") + " }";
+  return (
+    "{ " +
+    input.exposedKeys.map((k) => `${k}: ${input.exposedTypes.get(k) ?? "unknown"}`).join(", ") +
+    " }"
+  );
 }

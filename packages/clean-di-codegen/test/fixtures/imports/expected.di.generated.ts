@@ -7,7 +7,7 @@ import { createContext } from "clean-di/runtime";
 import { Logger } from "./Logger";
 import { commentsConfig } from "./commentsConfig";
 
-export const blogContext = createContext<void, { listComments: unknown }>(
+export const blogContext = createContext<void, { listComments: ListCommentsUseCase }>(
   (cfg) => {
     const logger = new Logger();
     const commentsRepository = new HttpCommentsRepository(logger);

@@ -8,7 +8,7 @@ import { Logger } from "./Logger";
 import { HttpPostsRepository } from "./HttpPostsRepository";
 import { ListPostsUseCase } from "./ListPostsUseCase";
 
-export const postsContext = createContext<PostsContextConfig, { listPosts: unknown }>(
+export const postsContext = createContext<PostsContextConfig, { listPosts: ListPostsUseCase }>(
   (cfg) => {
     const apiBaseUrl = cfg.apiBaseUrl;
     const logger = new Logger();

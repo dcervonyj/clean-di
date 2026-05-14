@@ -201,6 +201,8 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     ...importedHooks.preDestroySources,
   ];
 
+  const exposedTypes = buildExposedTypes(context.expose, localScope);
+
   const generated = formatGenerated({
     sourcePath: basename(sourcePath),
     generatorVersion,
@@ -210,6 +212,7 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     contextExportName: context.exportName,
     beansInTopoOrder: beans,
     exposedKeys: context.expose,
+    exposedTypes,
     headerTemplate: DEFAULT_HEADER,
     postConstructSources,
     preDestroySources,
@@ -424,4 +427,28 @@ function extractHookFromSpec(
     return prop.initializer;
   }
   return undefined;
+}
+
+/**
+ * Build a map from exposed key → TypeScript type name for the generated
+ * `createContext<TConfig, { ... }>` second generic.
+ *
+ * For `bean(ClassName)` entries the type name is the class name string.
+ * All other bean kinds (provide, synthetic config) fall back to "unknown".
+ */
+function buildExposedTypes(
+  exposedKeys: readonly string[],
+  scope: ReadonlyMap<string, BeanScopeEntry>,
+): ReadonlyMap<string, string> {
+  const result = new Map<string, string>();
+  for (const key of exposedKeys) {
+    const entry = scope.get(key);
+    if (entry !== undefined && entry.kind === "bean") {
+      const name = entry.classDeclaration?.name?.text ?? entry.classSymbol?.name;
+      result.set(key, name ?? "unknown");
+    } else {
+      result.set(key, "unknown");
+    }
+  }
+  return result;
 }

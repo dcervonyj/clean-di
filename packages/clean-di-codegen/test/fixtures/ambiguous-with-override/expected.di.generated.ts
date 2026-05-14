@@ -8,7 +8,7 @@ import { MainLogger } from "./MainLogger";
 import { BackupLogger } from "./BackupLogger";
 import { UseCase } from "./UseCase";
 
-export const appContext = createContext<AppConfig, { useCase: unknown }>(
+export const appContext = createContext<AppConfig, { useCase: UseCase }>(
   (cfg) => {
     const mode = cfg.mode;
     const mainLogger = new MainLogger();

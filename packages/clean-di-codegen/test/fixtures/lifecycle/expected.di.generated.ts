@@ -7,7 +7,7 @@ import { createContext } from "clean-di/runtime";
 import { Logger } from "./Logger";
 import { Greeter } from "./Greeter";
 
-export const greeterContext = createContext<void, { greeter: unknown }>(
+export const greeterContext = createContext<void, { greeter: Greeter }>(
   (cfg) => {
     const logger = new Logger();
     const greeter = new Greeter(logger);

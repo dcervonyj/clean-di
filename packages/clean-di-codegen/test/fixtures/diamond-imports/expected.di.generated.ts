@@ -7,7 +7,7 @@ import { createContext } from "clean-di/runtime";
 import { aConfig } from "./aConfig";
 import { bConfig } from "./bConfig";
 
-export const appContext = createContext<void, { serviceA: unknown, serviceB: unknown }>(
+export const appContext = createContext<void, { serviceA: ServiceA, serviceB: ServiceB }>(
   (cfg) => {
     const logger = new Logger();
     const serviceA = new ServiceA(logger);
