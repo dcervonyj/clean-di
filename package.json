@@ -16,6 +16,7 @@
     "test": "vitest run",
     "tracer": "vitest run runtimeTracer",
     "typecheck": "pnpm -r run typecheck",
+    "docs:api": "typedoc",
     "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo coverage"
   },
   "devDependencies": {
@@ -26,6 +27,7 @@
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-unused-imports": "^3.2.0",
     "prettier": "^3.4.2",
+    "typedoc": "^0.28.19",
     "typescript": "^5.7.3",
     "vitest": "^3.0.5"
   }

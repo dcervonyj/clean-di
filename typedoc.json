@@ -1,0 +1,18 @@
+{
+  "$schema": "https://typedoc.app/schema.json",
+  "entryPoints": ["packages/clean-di/src/index.ts"],
+  "out": "doc/api",
+  "name": "clean-di API",
+  "readme": "none",
+  "includeVersion": true,
+  "categorizeByGroup": true,
+  "groupOrder": ["Functions", "Interfaces", "Type Aliases"],
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "navigationLinks": {
+    "GitHub": "https://github.com/dcervonyj/clean-di",
+    "Getting Started": "./GETTING_STARTED.md"
+  },
+  "plugin": [],
+  "tsconfig": "packages/clean-di/tsconfig.json"
+}

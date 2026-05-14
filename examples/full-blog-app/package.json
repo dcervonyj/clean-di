@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "start": "node dist/index.js",
     "codegen": "clean-di-codegen",
     "check:codegen": "clean-di-codegen --check"
