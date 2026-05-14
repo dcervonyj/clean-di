@@ -86,4 +86,36 @@ describe("formatGenerated()", () => {
     const out = formatGenerated({ ...baseInput, exposedKeys: [] });
     expect(out).toContain(`createContext<PostsContextConfig, {}>`);
   });
+
+  it("emits postConstruct field when postConstructSource is provided", () => {
+    const out = formatGenerated({
+      ...baseInput,
+      postConstructSource: "({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); }",
+    });
+
+    // Adapter wraps the user's hook to bridge `(beans, cfg)` → `(cfg)`.
+    expect(out).toContain(
+      "postConstruct: (cfg) => (({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg),",
+    );
+    expect(out).not.toContain("preDestroy:");
+  });
+
+  it("emits preDestroy field when preDestroySource is provided", () => {
+    const out = formatGenerated({
+      ...baseInput,
+      preDestroySource: "({ logger }) => { logger.info('bye'); }",
+    });
+
+    expect(out).toContain(
+      "preDestroy: (cfg) => (({ logger }) => { logger.info('bye'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg),",
+    );
+    expect(out).not.toContain("postConstruct:");
+  });
+
+  it("emits neither postConstruct nor preDestroy when both are undefined", () => {
+    const out = formatGenerated(baseInput);
+
+    expect(out).not.toContain("postConstruct:");
+    expect(out).not.toContain("preDestroy:");
+  });
 });

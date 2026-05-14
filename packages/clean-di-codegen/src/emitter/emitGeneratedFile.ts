@@ -162,6 +162,9 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     generatorVersion,
   });
 
+  const postConstructSource = context.postConstruct?.getText();
+  const preDestroySource = context.preDestroy?.getText();
+
   const generated = formatGenerated({
     sourcePath: basename(sourcePath),
     generatorVersion,
@@ -172,6 +175,8 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     beansInTopoOrder: beans,
     exposedKeys: context.expose,
     headerTemplate: DEFAULT_HEADER,
+    ...(postConstructSource !== undefined ? { postConstructSource } : {}),
+    ...(preDestroySource !== undefined ? { preDestroySource } : {}),
   });
 
   // Hash-based skip (DESIGN §7.9).
