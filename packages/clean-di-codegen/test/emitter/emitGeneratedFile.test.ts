@@ -107,11 +107,6 @@ describe("emitGeneratedFile() — MVP integration", () => {
       generatorVersion: "1.0.0",
     });
 
-    if (!result.wrote) {
-      // eslint-disable-next-line no-console
-      console.error("DEBUG diagnostics:", JSON.stringify(result.diagnostics, null, 2));
-    }
-
     expect(result.wrote).toBe(true);
     expect(result.diagnostics).toHaveLength(0);
     expect(reporter.hasErrors()).toBe(false);
