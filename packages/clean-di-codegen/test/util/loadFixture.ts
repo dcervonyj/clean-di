@@ -11,6 +11,8 @@ export interface FixtureLayout {
   readonly workDir: string;
   /** Absolute path of the copied `input.di.ts` inside `workDir`. */
   readonly inputPath: string;
+  /** Absolute path of the original fixture directory (for snapshot comparison). */
+  readonly fixturePath: string;
   /** The TS Program covering `workDir`. */
   readonly program: ts.Program;
   /** Parsed expected diagnostics, or `undefined` for positive fixtures. */
@@ -68,6 +70,7 @@ export async function loadFixture(fixtureDir: string): Promise<FixtureLayout> {
   return {
     workDir,
     inputPath,
+    fixturePath: fixtureDir,
     program,
     expectedDiagnostics,
     cleanup: () => rm(workDir, { recursive: true, force: true }),
@@ -112,7 +115,7 @@ async function copyTreeShallow(src: string, dst: string): Promise<void> {
     if (st.isDirectory()) {
       await mkdir(fullDst, { recursive: true });
       await copyTreeShallow(fullSrc, fullDst);
-    } else if (st.isFile() && entry !== "expected-diagnostics.json") {
+    } else if (st.isFile() && entry !== "expected-diagnostics.json" && entry !== "expected.di.generated.ts") {
       await copyFile(fullSrc, fullDst);
     }
   }

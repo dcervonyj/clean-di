@@ -1,4 +1,4 @@
-import { readdir, stat } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -116,6 +116,12 @@ describe("e2e fixture catalog (T-053)", async () => {
           }
           expect(result.wrote).toBe(true);
           expect(reporter.hasErrors()).toBe(false);
+
+          // P0-C: byte-for-byte snapshot comparison.
+          const generated = await readFile(result.outputPath, "utf8");
+          await expect(generated).toMatchFileSnapshot(
+            join(layout.fixturePath, "expected.di.generated.ts"),
+          );
         } finally {
           await layout.cleanup();
         }

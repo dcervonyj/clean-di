@@ -194,8 +194,10 @@ function walkImport(
  *   - identifier referencing a `const x = defineConfig({...})` declaration
  *   - inline `defineConfig({...})` call
  *   - `export const x = defineConfig({...})` re-exported and imported by alias
+ *
+ * Exported so the emitter can reuse it when walking imports for lifecycle hooks.
  */
-function resolveDefineConfigCall(
+export function resolveDefineConfigCall(
   checker: ts.TypeChecker,
   expr: ts.Expression,
 ): ts.CallExpression | null {

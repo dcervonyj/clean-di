@@ -10,7 +10,8 @@ import { DEFAULT_HEADER } from "../config/defaultConfig.js";
 
 import { parseDiFile } from "../analyzer/parseDiFile.js";
 import { collectContexts } from "../analyzer/collectContexts.js";
-import { buildBeanScopeWithImports, type BeanScopeEntry } from "../analyzer/buildBeanScope.js";
+import type { ContextDeclaration } from "../analyzer/collectContexts.js";
+import { buildBeanScopeWithImports, resolveDefineConfigCall, type BeanScopeEntry } from "../analyzer/buildBeanScope.js";
 import { resolveConstructor } from "../analyzer/resolveConstructor.js";
 import { topoSort } from "../analyzer/topoSort.js";
 import { validateExpose } from "../analyzer/validateExpose.js";
@@ -91,6 +92,12 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
       continue;
     }
 
+    if (entry.kind === "config") {
+      // Synthetic config bean (T-046) — no constructor to resolve; emits cfg.<name>.
+      resolvedArgs.set(name, []);
+      continue;
+    }
+
     if (entry.classDeclaration === undefined) {
       // bean(SomethingNonClass) — collected as bean but couldn't resolve the class.
       // No constructor to resolve; treat as zero-arg fallback.
@@ -154,6 +161,9 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     if (entry.kind === "provide") {
       return { name, rhs: emitProvideRhs(entry) };
     }
+    if (entry.kind === "config") {
+      return { name, rhs: `cfg.${name}` };
+    }
     const args = resolvedArgs.get(name) ?? [];
 
     return { name, rhs: emitBeanRhs(entry, args) };
@@ -167,8 +177,18 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     generatorVersion,
   });
 
-  const postConstructSource = context.postConstruct?.getText();
-  const preDestroySource = context.preDestroy?.getText();
+  const importedHooks = collectImportedLifecycleHooks(checker, context);
+
+  // postConstruct order: imported configs depth-first, then parent (DESIGN §5.6).
+  const postConstructSources: string[] = [
+    ...importedHooks.postConstructSources,
+    ...(context.postConstruct !== undefined ? [context.postConstruct.getText()] : []),
+  ];
+  // preDestroy order: parent first, then imports in LIFO order (DESIGN §5.6).
+  const preDestroySources: string[] = [
+    ...(context.preDestroy !== undefined ? [context.preDestroy.getText()] : []),
+    ...importedHooks.preDestroySources,
+  ];
 
   const generated = formatGenerated({
     sourcePath: basename(sourcePath),
@@ -180,8 +200,8 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     beansInTopoOrder: beans,
     exposedKeys: context.expose,
     headerTemplate: DEFAULT_HEADER,
-    ...(postConstructSource !== undefined ? { postConstructSource } : {}),
-    ...(preDestroySource !== undefined ? { preDestroySource } : {}),
+    postConstructSources,
+    preDestroySources,
   });
 
   // Hash-based skip (DESIGN §7.9).
@@ -297,4 +317,91 @@ function collectImports(sourceFile: ts.SourceFile): readonly EmittedImport[] {
   }
 
   return imports;
+}
+
+interface LifecycleHooks {
+  readonly postConstructSources: readonly string[];
+  readonly preDestroySources: readonly string[];
+}
+
+/**
+ * Walk the context's `imports` depth-first and collect the `postConstruct` /
+ * `preDestroy` hook source texts from every imported `defineConfig` spec in
+ * DESIGN §5.6 order.
+ *
+ * Returns ONLY the imported hooks; the caller appends/prepends the top-level
+ * context's own hook:
+ *   - postConstruct order: imported-depth-first THEN self
+ *   - preDestroy order: self THEN imported-LIFO (= reverse of postConstruct)
+ *
+ * Diamond imports are deduplicated by `ts.CallExpression` identity — the same
+ * `defineConfig` call node contributes its hooks exactly once.
+ */
+function collectImportedLifecycleHooks(
+  checker: ts.TypeChecker,
+  context: ContextDeclaration,
+): LifecycleHooks {
+  const postConstructSources: string[] = [];
+  const preDestroySources: string[] = [];
+  const visitedConfigs = new Set<ts.CallExpression>();
+
+  function walkImportExpr(importExpr: ts.Expression): void {
+    const configCall = resolveDefineConfigCall(checker, importExpr);
+    if (configCall === null || visitedConfigs.has(configCall)) return;
+    visitedConfigs.add(configCall);
+
+    const spec = configCall.arguments[0];
+    if (spec === undefined || !ts.isObjectLiteralExpression(spec)) return;
+
+    // Depth-first: recurse into nested imports before collecting this spec's hooks.
+    for (const nestedImport of extractImportsFromSpec(spec)) {
+      walkImportExpr(nestedImport);
+    }
+
+    const postConstruct = extractHookFromSpec(spec, "postConstruct");
+    if (postConstruct !== undefined) {
+      postConstructSources.push(postConstruct.getText());
+    }
+
+    const preDestroy = extractHookFromSpec(spec, "preDestroy");
+    if (preDestroy !== undefined) {
+      // Collect in same order as postConstruct; reverse at the end.
+      preDestroySources.push(preDestroy.getText());
+    }
+  }
+
+  for (const importExpr of context.imports) {
+    walkImportExpr(importExpr);
+  }
+
+  // preDestroy is the LIFO reversal of the postConstruct traversal order.
+  preDestroySources.reverse();
+
+  return { postConstructSources, preDestroySources };
+}
+
+/** Extract the `imports: [...]` elements from a defineConfig spec literal. */
+function extractImportsFromSpec(spec: ts.ObjectLiteralExpression): readonly ts.Expression[] {
+  for (const prop of spec.properties) {
+    if (!ts.isPropertyAssignment(prop)) continue;
+    if (!ts.isIdentifier(prop.name) && !ts.isStringLiteral(prop.name)) continue;
+    if (prop.name.text !== "imports") continue;
+    if (!ts.isArrayLiteralExpression(prop.initializer)) return [];
+    return [...prop.initializer.elements];
+  }
+  return [];
+}
+
+/** Extract a `postConstruct` or `preDestroy` expression from a defineConfig spec literal. */
+function extractHookFromSpec(
+  spec: ts.ObjectLiteralExpression,
+  key: "postConstruct" | "preDestroy",
+): ts.Expression | undefined {
+  for (const prop of spec.properties) {
+    if (!ts.isPropertyAssignment(prop)) continue;
+    if (!ts.isIdentifier(prop.name) && !ts.isStringLiteral(prop.name)) continue;
+    if (prop.name.text !== key) continue;
+    return prop.initializer;
+  }
+  return undefined;
 }

@@ -32,6 +32,8 @@ const baseInput: FormatGeneratedInput = {
     "// Generator: {generator}",
     "// Hash: {hash}",
   ].join("\n"),
+  postConstructSources: [],
+  preDestroySources: [],
 };
 
 describe("formatGenerated()", () => {
@@ -87,23 +89,23 @@ describe("formatGenerated()", () => {
     expect(out).toContain(`createContext<PostsContextConfig, {}>`);
   });
 
-  it("emits postConstruct field when postConstructSource is provided", () => {
+  it("emits postConstruct field when a single postConstructSource is provided", () => {
     const out = formatGenerated({
       ...baseInput,
-      postConstructSource: "({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); }",
+      postConstructSources: ["({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); }"],
     });
 
-    // Adapter wraps the user's hook to bridge `(beans, cfg)` → `(cfg)`.
+    // Single hook → inline expression form.
     expect(out).toContain(
       "postConstruct: (cfg) => (({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg),",
     );
     expect(out).not.toContain("preDestroy:");
   });
 
-  it("emits preDestroy field when preDestroySource is provided", () => {
+  it("emits preDestroy field when a single preDestroySource is provided", () => {
     const out = formatGenerated({
       ...baseInput,
-      preDestroySource: "({ logger }) => { logger.info('bye'); }",
+      preDestroySources: ["({ logger }) => { logger.info('bye'); }"],
     });
 
     expect(out).toContain(
@@ -112,7 +114,37 @@ describe("formatGenerated()", () => {
     expect(out).not.toContain("postConstruct:");
   });
 
-  it("emits neither postConstruct nor preDestroy when both are undefined", () => {
+  it("emits block-form postConstruct when multiple postConstructSources are provided", () => {
+    const out = formatGenerated({
+      ...baseInput,
+      postConstructSources: [
+        "({ logger }) => { logger.info('imported init'); }",
+        "({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); }",
+      ],
+    });
+
+    // Block form wraps all hooks in a block arrow.
+    expect(out).toContain("postConstruct: (cfg) => {");
+    expect(out).toContain("(({ logger }) => { logger.info('imported init'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg);");
+    expect(out).toContain("(({ logger }, cfg) => { logger.info(cfg.apiBaseUrl); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg);");
+    expect(out).not.toContain("preDestroy:");
+  });
+
+  it("emits block-form preDestroy when multiple preDestroySources are provided", () => {
+    const out = formatGenerated({
+      ...baseInput,
+      preDestroySources: [
+        "({ logger }) => { logger.info('first destroy'); }",
+        "({ logger }) => { logger.info('second destroy'); }",
+      ],
+    });
+
+    expect(out).toContain("preDestroy: (cfg) => {");
+    expect(out).toContain("(({ logger }) => { logger.info('first destroy'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg);");
+    expect(out).toContain("(({ logger }) => { logger.info('second destroy'); })({ apiBaseUrl, authToken, logger, postsRepository, listPosts }, cfg);");
+  });
+
+  it("emits neither postConstruct nor preDestroy when both arrays are empty", () => {
     const out = formatGenerated(baseInput);
 
     expect(out).not.toContain("postConstruct:");

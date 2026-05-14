@@ -61,10 +61,18 @@ export interface FormatGeneratedInput {
   readonly exposedKeys: readonly string[];
   /** Header template (defaults to `DEFAULT_HEADER` from `config/defaultConfig.ts`). */
   readonly headerTemplate: string;
-  /** Source text of the `postConstruct` arrow / function expression, or undefined. */
-  readonly postConstructSource?: string;
-  /** Source text of the `preDestroy` arrow / function expression, or undefined. */
-  readonly preDestroySource?: string;
+  /**
+   * Source texts of all postConstruct hooks to call, in order:
+   * imported configs first (depth-first), then the top-level context's hook.
+   * Empty array = no postConstruct emitted.
+   */
+  readonly postConstructSources: readonly string[];
+  /**
+   * Source texts of all preDestroy hooks to call, in order:
+   * top-level context first, then imported configs in LIFO order.
+   * Empty array = no preDestroy emitted.
+   */
+  readonly preDestroySources: readonly string[];
 }
 
 /**
@@ -134,21 +142,35 @@ function renderImport(imp: EmittedImport): string {
 
 /**
  * Render the optional `postConstruct` / `preDestroy` fields for the BuildResult
- * literal. The user's hook is authored as `(beans, cfg) => ...`, but the
- * `BuildResult` shape expects `(config: unknown) => void`. We wrap the user's
- * hook in a thin adapter that supplies the locally-built bean bag.
+ * literal. Each hook is authored as `(beans, cfg) => ...`; we wrap it in a
+ * thin adapter that supplies the locally-built bean bag.
+ *
+ * Single hook  → inline expression form: `postConstruct: (cfg) => (<hook>)({...}, cfg),`
+ * Multiple hooks → block form: calls each hook in sequence inside a block arrow.
  */
 function renderHookLines(input: FormatGeneratedInput, bagFields: string): readonly string[] {
   const lines: string[] = [];
 
-  if (input.postConstructSource !== undefined) {
+  if (input.postConstructSources.length === 1) {
     lines.push(
-      `      postConstruct: (cfg) => (${input.postConstructSource})({ ${bagFields} }, cfg),`,
+      `      postConstruct: (cfg) => (${input.postConstructSources[0]!})({ ${bagFields} }, cfg),`,
     );
+  } else if (input.postConstructSources.length > 1) {
+    lines.push(`      postConstruct: (cfg) => {`);
+    for (const src of input.postConstructSources) {
+      lines.push(`        (${src})({ ${bagFields} }, cfg);`);
+    }
+    lines.push(`      },`);
   }
 
-  if (input.preDestroySource !== undefined) {
-    lines.push(`      preDestroy: (cfg) => (${input.preDestroySource})({ ${bagFields} }, cfg),`);
+  if (input.preDestroySources.length === 1) {
+    lines.push(`      preDestroy: (cfg) => (${input.preDestroySources[0]!})({ ${bagFields} }, cfg),`);
+  } else if (input.preDestroySources.length > 1) {
+    lines.push(`      preDestroy: (cfg) => {`);
+    for (const src of input.preDestroySources) {
+      lines.push(`        (${src})({ ${bagFields} }, cfg);`);
+    }
+    lines.push(`      },`);
   }
 
   return lines;
