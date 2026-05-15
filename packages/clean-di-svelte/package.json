@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@testing-library/svelte": "^5.0.0",
-    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "clean-di": "workspace:*",
     "jsdom": "^25.0.0",
     "svelte": "^5.0.0",

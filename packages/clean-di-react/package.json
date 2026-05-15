@@ -1,0 +1,63 @@
+{
+  "name": "clean-di-react",
+  "version": "0.1.0",
+  "description": "React integration for clean-di: DiProvider, hooks (useBean/useExpose), and HOC (createConnector/fullConnect).",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./mobx": {
+      "types": "./dist/mobx.d.ts",
+      "import": "./dist/mobx.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "peerDependencies": {
+    "clean-di": ">=1.0.0",
+    "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "mobx-react-lite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^18.3.0",
+    "clean-di": "workspace:*",
+    "jsdom": "^25.0.0",
+    "mobx": "^6.13.7",
+    "mobx-react-lite": "^4.1.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "dependency-injection",
+    "di",
+    "react",
+    "hooks",
+    "hoc",
+    "clean-di"
+  ]
+}
