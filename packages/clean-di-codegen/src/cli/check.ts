@@ -1,6 +1,6 @@
 import { dirname, resolve as pathResolve } from "node:path";
 
-import * as ts from "typescript";
+import type * as ts from "typescript";
 
 import { loadConfig } from "../config/loadConfig.js";
 import { DiagnosticReporter } from "../diagnostics/report.js";
