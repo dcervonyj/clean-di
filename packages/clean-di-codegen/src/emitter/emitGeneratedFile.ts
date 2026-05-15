@@ -218,7 +218,18 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
 
   const baseImports = collectImports(parsed.sourceFile);
   const extraImports = collectMissingBeanImports(localScope, baseImports, outputPath);
-  const imports = [...baseImports, ...extraImports];
+  const configTypeImport = collectConfigTypeImport(
+    checker,
+    context,
+    baseImports,
+    outputPath,
+    sourcePath,
+  );
+  const imports = [
+    ...baseImports,
+    ...extraImports,
+    ...(configTypeImport !== undefined ? [configTypeImport] : []),
+  ];
   const sourceFileContent = await readFile(sourcePath, "utf8");
   const hash = hashGeneratedFile({
     sourceFileContent,
@@ -441,6 +452,75 @@ function collectMissingBeanImports(
   }
 
   return extra;
+}
+
+/**
+ * Emit a `import { type ConfigType } from "./source.di.js"` when the config
+ * type is declared in the same `.di.ts` source file and is not already present
+ * in the re-emitted imports.
+ *
+ * This covers the common pattern where `PostsContextConfig` is defined as an
+ * interface or type alias at the top of `input.di.ts` rather than imported from
+ * another module. The generated file references the name in
+ * `createContext<PostsContextConfig, ...>` but would otherwise have no
+ * import for it.
+ *
+ * Returns `undefined` when no extra import is needed (void config, inline type,
+ * or the type is already covered by an existing import).
+ */
+function collectConfigTypeImport(
+  checker: ts.TypeChecker,
+  context: ContextDeclaration,
+  existingImports: readonly EmittedImport[],
+  outputPath: string,
+  sourcePath: string,
+): EmittedImport | undefined {
+  const { configTypeName, configType } = context;
+
+  // void / omitted config — nothing to import.
+  if (configTypeName === "void" || configType === undefined) {
+    return undefined;
+  }
+
+  // Non-identifier type names (inline object types, intersections, etc.) cannot
+  // be imported by name — skip.
+  if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(configTypeName)) {
+    return undefined;
+  }
+
+  // Already covered by a re-emitted import from the source file.
+  for (const imp of existingImports) {
+    for (const n of imp.named ?? []) {
+      if ((n.alias ?? n.name) === configTypeName) {
+        return undefined;
+      }
+    }
+    if (imp.defaultName === configTypeName) {
+      return undefined;
+    }
+  }
+
+  // Locate the symbol's declaration to confirm it lives in the source file.
+  const symbol = configType.aliasSymbol ?? configType.getSymbol();
+  if (symbol === undefined) {
+    return undefined;
+  }
+
+  const decls = symbol.getDeclarations() ?? [];
+  const declaredInSourceFile = decls.some((d) => d.getSourceFile().fileName === sourcePath);
+  if (!declaredInSourceFile) {
+    return undefined;
+  }
+
+  // Compute the relative path from the generated file back to the source .di.ts,
+  // using .js extension (NodeNext ESM convention).
+  const outputDir = dirname(outputPath);
+  let rel = relative(outputDir, sourcePath).replace(/\.ts$/, ".js");
+  if (!rel.startsWith(".")) {
+    rel = "./" + rel;
+  }
+
+  return { from: rel, named: [{ name: configTypeName, typeOnly: true }] };
 }
 
 interface LifecycleHooks {

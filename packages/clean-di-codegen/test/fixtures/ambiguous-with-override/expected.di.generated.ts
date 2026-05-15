@@ -7,6 +7,7 @@ import { createContext } from "clean-di/runtime";
 import { BackupLogger } from "./BackupLogger";
 import { MainLogger } from "./MainLogger";
 import { UseCase } from "./UseCase";
+import { type AppConfig } from "./input.di.js";
 
 export const appContext = createContext<AppConfig, { useCase: UseCase }>(
   (cfg) => {
