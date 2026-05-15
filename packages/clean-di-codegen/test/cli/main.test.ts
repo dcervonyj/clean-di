@@ -10,6 +10,7 @@ import { loadFixture } from "../util/loadFixture";
 
 const UNAMBIGUOUS_FIXTURE = join(__dirname, "../fixtures/unambiguous");
 const CDI007_FIXTURE = join(__dirname, "../fixtures/cdi-007-invalid-bean-def");
+const MULTI_CONTEXT_FIXTURE = join(__dirname, "../fixtures/multi-context");
 
 /** Write package.json + tsconfig so runOnce picks up root-level .di.ts files */
 async function writeTestConfig(dir: string): Promise<void> {
@@ -76,6 +77,24 @@ describe("runOnce", () => {
 
     expect(result.exitCode).toBe(1);
   });
+
+  it("emits one per-context file for a multi-context .di.ts", async () => {
+    const layout = await loadFixture(MULTI_CONTEXT_FIXTURE);
+    cleanups.push(layout.cleanup);
+    await writeTestConfig(layout.workDir);
+
+    const result = await runOnce({
+      cwd: layout.workDir,
+      generatorVersion: "test-0.0.0",
+      noColor: true,
+    });
+
+    expect(result.exitCode).toBe(0);
+    // Both contexts must be written.
+    expect(result.filesWritten).toBe(2);
+    expect(existsSync(join(layout.workDir, "input.contextA.di.generated.ts"))).toBe(true);
+    expect(existsSync(join(layout.workDir, "input.contextB.di.generated.ts"))).toBe(true);
+  }, 15_000);
 
   it("returns filesProcessed=0 when no .di.ts files exist", async () => {
     const workDir = join(tmpdir(), `clean-di-empty-${Date.now()}`);

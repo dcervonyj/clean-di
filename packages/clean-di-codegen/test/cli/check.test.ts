@@ -8,6 +8,7 @@ import { runOnce } from "../../src/cli/main";
 import { loadFixture } from "../util/loadFixture";
 
 const UNAMBIGUOUS_FIXTURE = join(__dirname, "../fixtures/unambiguous");
+const MULTI_CONTEXT_FIXTURE = join(__dirname, "../fixtures/multi-context");
 
 async function writeTestConfig(dir: string): Promise<void> {
   await writeFile(
@@ -101,4 +102,23 @@ describe("runCheck", () => {
     expect(result.exitCode).toBe(1);
     expect(result.staleFiles).toContain(generatedPath);
   });
+
+  it("flags all missing per-context files as stale for a multi-context .di.ts", async () => {
+    const layout = await loadFixture(MULTI_CONTEXT_FIXTURE);
+    cleanups.push(layout.cleanup);
+    await writeTestConfig(layout.workDir);
+
+    // No generated files present — both per-context outputs must be stale.
+    const result = await runCheck({
+      cwd: layout.workDir,
+      generatorVersion: "test-0.0.0",
+      noColor: true,
+    });
+
+    expect(result.exitCode).toBe(1);
+    // Two contexts → two stale files.
+    expect(result.staleFiles.length).toBe(2);
+    expect(result.staleFiles.some((f) => f.includes("contextA"))).toBe(true);
+    expect(result.staleFiles.some((f) => f.includes("contextB"))).toBe(true);
+  }, 15_000);
 });

@@ -48,16 +48,7 @@ export async function runOnce(options: RunOnceOptions): Promise<RunOnceResult> {
 
   let filesWritten = 0;
   for (const filePath of diFiles) {
-    const result = await emitGeneratedFile({
-      sourcePath: filePath,
-      program,
-      reporter,
-      generatorVersion: options.generatorVersion,
-    });
-
-    if (result.wrote) {
-      filesWritten++;
-    }
+    filesWritten += await emitAllContexts(filePath, program, reporter, options.generatorVersion);
   }
 
   reporter.flush();
@@ -66,6 +57,49 @@ export async function runOnce(options: RunOnceOptions): Promise<RunOnceResult> {
     filesProcessed: diFiles.length,
     filesWritten,
   };
+}
+
+/**
+ * Emit all well-formed contexts in a single `.di.ts` file.
+ *
+ * When the file has exactly one context the existing single-file output path
+ * (`X.di.generated.ts`) is used for backward compatibility. When there are N>1
+ * contexts each gets its own `X.<varName>.di.generated.ts` file.
+ *
+ * Returns the number of files written.
+ */
+export async function emitAllContexts(
+  sourcePath: string,
+  program: ts.Program,
+  reporter: DiagnosticReporter,
+  generatorVersion: string,
+): Promise<number> {
+  // First call discovers the context list (contextIndex 0).
+  const first = await emitGeneratedFile({
+    sourcePath,
+    program,
+    reporter,
+    generatorVersion,
+    contextIndex: 0,
+  });
+
+  let written = first.wrote ? 1 : 0;
+
+  // If the file contains more than one context, emit the rest.
+  for (let i = 1; i < first.allContextNames.length; i++) {
+    const result = await emitGeneratedFile({
+      sourcePath,
+      program,
+      reporter,
+      generatorVersion,
+      contextIndex: i,
+    });
+    if (result.wrote) {
+      written++;
+    }
+  }
+
+  return written;
 }
 
 /**

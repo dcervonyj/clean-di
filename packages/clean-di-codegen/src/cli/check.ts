@@ -1,5 +1,7 @@
 import { dirname, resolve as pathResolve } from "node:path";
 
+import * as ts from "typescript";
+
 import { loadConfig } from "../config/loadConfig.js";
 import { DiagnosticReporter } from "../diagnostics/report.js";
 import { emitGeneratedFile } from "../emitter/emitGeneratedFile.js";
@@ -46,17 +48,15 @@ export async function runCheck(options: RunCheckOptions): Promise<RunCheckResult
   const staleFiles: string[] = [];
 
   for (const filePath of diFiles) {
-    const result = await emitGeneratedFile({
-      sourcePath: filePath,
+    const fileStaleFiles = await checkAllContexts(
+      filePath,
       program,
       reporter,
-      generatorVersion: options.generatorVersion,
-      dryRun: true,
-    });
-
-    if (result.stale) {
-      staleFiles.push(result.outputPath);
-      log(`✗ stale: ${result.outputPath}\n`);
+      options.generatorVersion,
+    );
+    for (const stalePath of fileStaleFiles) {
+      staleFiles.push(stalePath);
+      log(`✗ stale: ${stalePath}\n`);
     }
   }
 
@@ -66,4 +66,50 @@ export async function runCheck(options: RunCheckOptions): Promise<RunCheckResult
     exitCode: staleFiles.length > 0 || reporter.hasErrors() ? 1 : 0,
     staleFiles,
   };
+}
+
+/**
+ * Run a dry-run check for all well-formed contexts in a single `.di.ts` file.
+ *
+ * Mirrors the multi-context logic in `emitAllContexts` from `main.ts` but uses
+ * `dryRun: true` so nothing is written. Returns the paths of any stale or
+ * missing generated files.
+ */
+async function checkAllContexts(
+  sourcePath: string,
+  program: ts.Program,
+  reporter: DiagnosticReporter,
+  generatorVersion: string,
+): Promise<readonly string[]> {
+  // First call discovers the context list (contextIndex 0).
+  const first = await emitGeneratedFile({
+    sourcePath,
+    program,
+    reporter,
+    generatorVersion,
+    contextIndex: 0,
+    dryRun: true,
+  });
+
+  const stale: string[] = [];
+  if (first.stale) {
+    stale.push(first.outputPath);
+  }
+
+  // If the file contains more than one context, check the rest.
+  for (let i = 1; i < first.allContextNames.length; i++) {
+    const result = await emitGeneratedFile({
+      sourcePath,
+      program,
+      reporter,
+      generatorVersion,
+      contextIndex: i,
+      dryRun: true,
+    });
+    if (result.stale) {
+      stale.push(result.outputPath);
+    }
+  }
+
+  return stale;
 }

@@ -42,6 +42,14 @@ export interface EmitInput {
    * `--check` mode (DESIGN §7.9).
    */
   readonly dryRun?: boolean;
+  /**
+   * Index into the `contexts` array to emit. Defaults to 0.
+   * When a file contains multiple `defineContext()` calls (N > 1), callers
+   * should pass each index in turn. The output path becomes
+   * `<base>.<exportName>.di.generated.ts` when the file has more than one
+   * well-formed context.
+   */
+  readonly contextIndex?: number;
 }
 
 export interface RunResult {
@@ -56,6 +64,11 @@ export interface RunResult {
   readonly diagnostics: readonly Diagnostic[];
   /** Path of the generated file. */
   readonly outputPath: string;
+  /**
+   * Export names of all well-formed contexts found in the source file.
+   * Always populated so callers can discover N>1 contexts and loop.
+   */
+  readonly allContextNames: readonly string[];
 }
 
 /**
@@ -70,12 +83,17 @@ export interface RunResult {
  */
 export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
   const { sourcePath, program, reporter, generatorVersion } = input;
-  const outputPath = computeOutputPath(sourcePath);
+  const contextIndex = input.contextIndex ?? 0;
   const checker = program.getTypeChecker();
 
   const parsed = parseDiFile(program, sourcePath);
   const { contexts, diagnostics: shapeDiagnostics } = collectContexts(parsed);
 
+  const allContextNames = contexts.map((c) => c.exportName);
+  const multiContext = contexts.length > 1;
+
+  // For the early-out paths, still compute a meaningful outputPath.
+  const placeholderOutputPath = computeOutputPath(sourcePath, undefined);
   const allDiagnostics: Diagnostic[] = [...shapeDiagnostics];
 
   if (contexts.length === 0) {
@@ -85,11 +103,20 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
       reporter.add(d);
     }
 
-    return { wrote: false, stale: false, diagnostics: allDiagnostics, outputPath };
+    return {
+      wrote: false,
+      stale: false,
+      diagnostics: allDiagnostics,
+      outputPath: placeholderOutputPath,
+      allContextNames,
+    };
   }
 
-  // W3 MVP supports a single context per file. Take the first well-formed one.
-  const context = contexts[0]!;
+  // Pick the requested context by index (defaults to 0 for backward compat).
+  const context = contexts[contextIndex] ?? contexts[0]!;
+  // When the file contains multiple contexts, include the export name in the
+  // output path so each context gets its own `.di.generated.ts` file.
+  const outputPath = computeOutputPath(sourcePath, multiContext ? context.exportName : undefined);
   const { scope: localScope, diagnostics: scopeDiagnostics } = buildBeanScopeWithImports(
     checker,
     context,
@@ -163,7 +190,7 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
       reporter.add(d);
     }
 
-    return { wrote: false, stale: false, diagnostics: allDiagnostics, outputPath };
+    return { wrote: false, stale: false, diagnostics: allDiagnostics, outputPath, allContextNames };
   }
 
   // If we already collected non-cycle errors, still emit them but don't write.
@@ -172,7 +199,7 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
       reporter.add(d);
     }
 
-    return { wrote: false, stale: false, diagnostics: allDiagnostics, outputPath };
+    return { wrote: false, stale: false, diagnostics: allDiagnostics, outputPath, allContextNames };
   }
 
   // 3d: format the generated file.
@@ -232,10 +259,16 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
   // dryRun: compare against committed file without writing (DESIGN §7.9 --check).
   if (input.dryRun === true) {
     if (!existsSync(outputPath)) {
-      return { wrote: false, stale: true, diagnostics: [], outputPath };
+      return { wrote: false, stale: true, diagnostics: [], outputPath, allContextNames };
     }
     const existing = await readFile(outputPath, "utf8");
-    return { wrote: false, stale: existing !== generated, diagnostics: [], outputPath };
+    return {
+      wrote: false,
+      stale: existing !== generated,
+      diagnostics: [],
+      outputPath,
+      allContextNames,
+    };
   }
 
   // Hash-based skip (DESIGN §7.9).
@@ -243,19 +276,24 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     const existing = await readFile(outputPath, "utf8");
     const existingHashMatch = existing.match(/Hash: sha256:([0-9a-f]+)/);
     if (existingHashMatch !== null && existingHashMatch[1] === hash) {
-      return { wrote: false, stale: false, diagnostics: [], outputPath };
+      return { wrote: false, stale: false, diagnostics: [], outputPath, allContextNames };
     }
   }
 
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, generated, "utf8");
 
-  return { wrote: true, stale: false, diagnostics: [], outputPath };
+  return { wrote: true, stale: false, diagnostics: [], outputPath, allContextNames };
 }
 
-function computeOutputPath(sourcePath: string): string {
-  // X.di.ts → X.di.generated.ts (adjacent mode — the only mode in v1)
-  return sourcePath.replace(/\.di\.ts$/, ".di.generated.ts");
+function computeOutputPath(sourcePath: string, varName: string | undefined): string {
+  // Single-context (or single-context backward compat): X.di.ts → X.di.generated.ts
+  // Multi-context: X.di.ts → X.<varName>.di.generated.ts (one file per context)
+  if (varName === undefined) {
+    return sourcePath.replace(/\.di\.ts$/, ".di.generated.ts");
+  }
+
+  return sourcePath.replace(/\.di\.ts$/, `.${varName}.di.generated.ts`);
 }
 
 function emitProvideRhs(entry: BeanScopeEntry): string {
