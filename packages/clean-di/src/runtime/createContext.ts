@@ -61,7 +61,6 @@ export function createContext<TConfig, TExposed>(
     const entry = cache.get(resolvedKey);
 
     if (entry === undefined) {
-      // eslint-disable-next-line no-console
       console.warn(`CDIE-102: destroy() called for unknown key ${String(resolvedKey)}.`);
 
       return;

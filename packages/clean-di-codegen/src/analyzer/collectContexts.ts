@@ -122,7 +122,6 @@ export function collectContexts(parsed: ParsedDiFile): CollectContextsResult {
   }
 
   if (contexts.length > 1) {
-    // eslint-disable-next-line no-console
     console.warn(
       `clean-di-codegen: ${parsed.sourceFile.fileName} contains ${contexts.length} contexts — one per file is recommended.`,
     );

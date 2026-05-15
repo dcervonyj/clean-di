@@ -25,7 +25,7 @@ class PrivateThing {
 
 describe("DSL type surface (T-028)", () => {
   it("defineContext infers TBeans from the spec literal", () => {
-    const ctx = defineContext<{ name: string }>()({
+    const _ctx = defineContext<{ name: string }>()({
       beans: {
         logger: provide(() => new Logger()),
         counter: bean(Counter),
@@ -35,23 +35,23 @@ describe("DSL type surface (T-028)", () => {
 
     // The exposed shape is { logger: Logger, counter: Counter } — TBeans was
     // inferred from the spec literal (no manual generic argument needed).
-    // Use ReturnType to keep this purely type-level — calling ctx.get at
+    // Use ReturnType to keep this purely type-level — calling _ctx.get at
     // runtime would trip the pre-codegen fail-loud guard in defineContext.
-    expectTypeOf<ReturnType<typeof ctx.get>>().toEqualTypeOf<{
+    expectTypeOf<ReturnType<typeof _ctx.get>>().toEqualTypeOf<{
       logger: Logger;
       counter: Counter;
     }>();
   });
 
   it("Container.get requires { config } when TConfig is non-void", () => {
-    const ctx = defineContext<{ apiUrl: string }>()({
+    const _ctx = defineContext<{ apiUrl: string }>()({
       beans: { logger: provide(() => new Logger()) },
       expose: ["logger"] as const,
     });
 
     // The overload picks the shape that includes `config`. `readonly` modifiers
     // match the actual definition in `Container.ts`.
-    expectTypeOf(ctx.get).parameter(0).toEqualTypeOf<{
+    expectTypeOf(_ctx.get).parameter(0).toEqualTypeOf<{
       readonly config: { apiUrl: string };
       readonly key?: unknown;
     }>();
@@ -70,7 +70,7 @@ describe("DSL type surface (T-028)", () => {
   });
 
   it("ExposedOf narrows the bean bag to only the exposed keys", () => {
-    const ctx = defineContext()({
+    const _ctx = defineContext()({
       beans: {
         logger: provide(() => new Logger()),
         counter: bean(Counter),
@@ -80,8 +80,8 @@ describe("DSL type surface (T-028)", () => {
     });
 
     // `privateThing` and `counter` are stripped by ExposedOf — the bag exposes
-    // only `logger`. Type-only check (no runtime call on ctx.get).
-    type Exposed = ReturnType<typeof ctx.get>;
+    // only `logger`. Type-only check (no runtime call on _ctx.get).
+    type Exposed = ReturnType<typeof _ctx.get>;
     expectTypeOf<Exposed>().toEqualTypeOf<{ logger: Logger }>();
 
     // And the narrowed key set means `privateThing` is not accessible:
