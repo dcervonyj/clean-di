@@ -17,7 +17,7 @@ export default tseslint.config(
   // recommended base + typescript-eslint recommended
   ...tseslint.configs.recommended,
   {
-    files: ["**/*.ts"],
+    files: ["**/*.ts", "**/*.tsx"],
     plugins: {
       import: importPlugin,
       "unused-imports": unusedImports,
