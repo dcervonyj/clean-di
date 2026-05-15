@@ -18,6 +18,13 @@ export interface RunWatchOptions {
   readonly onReady?: () => void;
   /** Called each time a file is successfully emitted. For testing. */
   readonly onEmit?: (filePath: string) => void;
+  /**
+   * Test-only: called after the initial pass with a reference to
+   * `processChanged`. Tests can invoke `processChanged()` directly to simulate
+   * a file-change cycle without relying on chokidar's FS event delivery (which
+   * is unreliable in tmpdir on macOS).
+   */
+  readonly _triggerChange?: (processChanged: () => Promise<void>) => void;
 }
 
 /**
@@ -102,6 +109,7 @@ export async function runWatch(options: RunWatchOptions): Promise<() => Promise<
   watcher.on("unlink", scheduleChange);
   watcher.on("ready", () => {
     options.onReady?.();
+    options._triggerChange?.(processChanged);
   });
 
   return async () => {
