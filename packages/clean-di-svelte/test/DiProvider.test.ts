@@ -2,13 +2,13 @@ import { cleanup, render } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { getExpose } from "../src/getExpose.js";
-import { configContainer, voidContainer } from "./helpers.js";
 
 import ConfigGreeterConsumer from "./components/ConfigGreeterConsumer.svelte";
 import ConfigProviderWrapper from "./components/ConfigProviderWrapper.svelte";
 import GreeterConsumer from "./components/GreeterConsumer.svelte";
 import SameInstanceConsumer from "./components/SameInstanceConsumer.svelte";
 import VoidProviderWrapper from "./components/VoidProviderWrapper.svelte";
+import { configContainer, voidContainer } from "./helpers.js";
 
 afterEach(() => {
   cleanup();

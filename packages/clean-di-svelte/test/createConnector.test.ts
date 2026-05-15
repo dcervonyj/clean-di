@@ -2,10 +2,11 @@ import { cleanup, render } from "@testing-library/svelte";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createConnector } from "../src/createConnector.js";
-import { configContainer, voidContainer } from "./helpers.js";
+
 
 import ConnectorConsumer from "./components/ConnectorConsumer.svelte";
 import VoidProviderWrapper from "./components/VoidProviderWrapper.svelte";
+import { configContainer, voidContainer } from "./helpers.js";
 
 afterEach(() => {
   cleanup();
