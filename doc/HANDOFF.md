@@ -237,123 +237,51 @@ When sequential merges are needed: **merge least-likely-to-conflict first**. Eac
 
 ---
 
-## 5. State summary at end of last session
+## 5. Current state (v1.0.0 — merged to master)
+
+All waves W1–W8 are complete and merged. The project is at **v1.0.0** on `master`.
 
 ### Tests
 
-- **183 passing / 183 total** across 24 test files (`pnpm test`)
-- Test runtime: ~6 seconds
-- Both packages typecheck (`pnpm typecheck`)
+- **282 passing / 282 total** across all workspace packages (`pnpm test`)
+- Coverage: 100 % lines/functions/statements for `clean-di`; branch thresholds met for `clean-di-codegen`
+- CI: all 4 jobs green (ci/20, ci/22, changeset-status, smoke-test)
 
-### Fixture catalog (16 scenarios, 23 discovered cases)
+### What's shipped
 
-- 6 positive: `unambiguous`, `ambiguous-with-override`, `name-fallback`, `imports`, `diamond-imports`, `lifecycle`
-- 10 negative: `cdi-001` through `cdi-010` (cdi-005 has 4 sub-cases, cdi-008 has 5)
+| Wave  | Scope                                                                                                                                        |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| W1–W4 | Monorepo, runtime, DSL, full analyzer + emitter, diagnostic catalog (CDI-001–010)                                                            |
+| W5    | CLI (`--watch`, `--check`, one-shot), programmatic API, args parsing                                                                         |
+| W6    | Examples (`basic`, `modular`, `full-blog-app`), README, GETTING_STARTED, MIGRATION, TypeDoc                                                  |
+| W7    | Changesets, npm publish workflow, `doc/VERSIONING.md`, `doc/API_FREEZE.md`, v1.0.0 tag                                                       |
+| W8    | Watch-mode integration tests (T-083), multi-context emit per file (T-084), CLI subprocess tests (T-085), codegen→tsc roundtrip tests (T-086) |
 
-### What's done (W1–W4)
+### Open design questions — resolution status
 
-- Monorepo + tooling
-- `clean-di` runtime (`createContext`, `Container`, lifecycle, scoping)
-- Public DSL (`defineContext`, `defineConfig`, `provide`, `bean`)
-- Codegen analyzer (parse → collect → scope → resolve → topo-sort)
-- Codegen emitter (`formatGenerated` + `emitGeneratedFile` orchestrator)
-- Full diagnostic catalog (CDI-001 through CDI-010, CDIE-101 through CDIE-104)
-- Override resolution, name fallback, import composition, lifecycle hook wiring, synthetic config beans
-- E2E fixture catalog auto-discovery test
+1. **Lifecycle composition across imports** — ✅ implemented in `collectImportedLifecycleHooks` (see `emitGeneratedFile.ts`)
+2. **Byte-for-byte snapshot comparison for positive fixtures** — ✅ done (all positive fixtures have `expected.di.generated.ts` checked in; e2e test uses `toMatchFileSnapshot`)
+3. **Multi-context per file** — ✅ done in T-084 (`emitAllContexts` loop; `foo.<varName>.di.generated.ts` naming)
+4. **Generic invariance fixtures** — open, low priority
+5. **Synthetic config bean emission** — ✅ verified correct; covered by `config-bean-direct` fixture
 
-### What's NOT done (W5–W7)
-
-- **W5 CLI** (9 tasks): `--watch`, `--check`, `args parsing`, `bin entry`, programmatic API. Analyzer + emitter APIs are stable, so W5 can start any time.
-- **W6 examples + docs** (12 tasks): `examples/basic/`, `examples/modular/`, `examples/full-blog-app/`, user-facing `README`, `GETTING_STARTED`, `MIGRATION` guides.
-- **W7 release prep** (5 tasks): changesets, npm publish workflow, v1.0.0 tag.
-
-### Known issues (not blocking)
+### Known remaining issues (non-blocking)
 
 - **Vitest workspace deprecation** — `vitest.workspace.ts` should migrate to root-config `test.projects` before Vitest v4.
-- **ESLint 8 EOL** — works fine, eventual migration to ESLint 9 + flat config will be needed.
-- **6 transitive deprecation warnings** during `pnpm install` (all under the ESLint 8 tree).
+- **ESLint 8 EOL** — eventual migration to ESLint 9 + flat config needed.
+- **npm publish not yet run** — `release.yml` is wired; needs `NPM_TOKEN` secret set in repo settings to actually publish.
+- **GitHub Actions Node 20 deprecation warning** — actions/checkout, setup-node, pnpm/action-setup will need updating before June 2026.
 
 ---
 
-## 6. Open design questions for the next session
-
-These were raised but never fully resolved. Worth re-deciding before W5/W6.
-
-1. **Lifecycle composition across imports.** Right now T-049 emits only the top-level context's `postConstruct` / `preDestroy`. DESIGN §5.6 specifies "imports-first-then-parent" for postConstruct and "parent-first-then-imports-LIFO" for preDestroy. Imported `defineConfig` lifecycle hooks aren't aggregated yet. This is a real W5/W6 follow-up.
-
-2. **`expected.di.generated.ts` byte-for-byte snapshots for positive fixtures.** T-053 deferred these — the e2e test currently asserts structural correctness (`wrote: true`, no errors) but doesn't compare emitted bytes against a checked-in expected. Adding the snapshots is straightforward once W6's examples land and the emit format is locked.
-
-3. **Multi-context per file.** Currently the orchestrator processes only `contexts[0]`. A `.di.ts` with multiple `defineContext()` calls is partially supported (the analyzer collects all of them; the orchestrator uses just the first and warns about extras). Multi-emit is a future enhancement.
-
-4. **Generic invariance in `resolveOneParam`.** T-054's invariance test uses a phantom-typed generic class. Real-world cases would have type arguments like `Repository<Post>` declared in `application/ports/` and consumed by use cases. The current behavior is correct (relies on `isTypeAssignableTo`), but it's worth adding more real-world-shaped fixtures.
-
-5. **Synthetic config bean emission.** T-046 made config fields visible in scope by name, but the orchestrator's emitter (T-049) doesn't emit `cfg.x` references for `kind: "config"` entries yet — they fall through to the `bean`-shaped path with `new <unknown>()`. The plumbing exists; the emitter branch needs adding. This matters when a constructor param is resolved against a synthetic config bean — the generated file currently can't actually emit the right expression. Verify with a focused test before claiming v1 ready.
-
----
-
-## 7. Repo / GitHub setup
+## 6. Repo / GitHub setup
 
 - **Remote:** `https://github.com/dcervonyj/clean-di` (default branch `master`).
-- **Active gh account:** `dcervonyj` (after the W4 push).
-- **License:** MIT (already in repo).
-- **CI:** GitHub Actions workflow lives at `.github/workflows/ci.yml`; runs lint + typecheck + test + build on Node 20 + 22.
-- **No npm publishing yet.** W7 wires the publish workflow.
+- **Active gh account:** `dcervonyj`.
+- **License:** MIT.
+- **CI:** `.github/workflows/ci.yml` — lint + typecheck + test + build + examples + coverage + smoke-test on Node 20 + 22.
+- **Release:** `.github/workflows/release.yml` — `changesets/action@v1`; triggers on push to `master`; requires `NPM_TOKEN` secret.
 
 ---
 
-_End of original handoff. Cross-references: `doc/DESIGN.md` for the architectural spec, `doc/BACKLOG.md` for the full task list, `doc/REPO_GUIDE.md` for the verification plan + repo map._
-
----
-
-## 8. State at end of fix/p0-pre-w5-gaps (W6 + W7 in progress)
-
-### Branch
-
-`fix/p0-pre-w5-gaps` — active, not yet merged to `master`.
-
-### Tests
-
-- **259 passing / 259 total** across all workspace packages (`pnpm test`)
-- Coverage thresholds: 100 % lines/functions/statements for `clean-di`; 85 % for `clean-di-codegen` — both configured in each package's `vitest.config.ts`
-- `pnpm test:coverage` runs coverage from the root; per-package `test:coverage` scripts also available
-
-### What was done in this phase (T-067 → T-075)
-
-| Commit | Tasks | Notes |
-|--------|-------|-------|
-| `213ec60` | T-067 | `examples/full-blog-app/`; `provide()` return-type fix; lifecycle `cfg` arity fix |
-| `adca9df` | T-068 | Examples wired into pnpm workspace + CI build |
-| `383f9f7` | T-069–T-074 | Docs (README, GETTING_STARTED, MIGRATION, REPO_GUIDE), TypeDoc, per-example tests (259 tests) |
-| `e5c87b9` | T-075 | Coverage config in each vitest.config; `test:coverage` scripts; CI artifact upload |
-
-### Last pushed commit
-
-`e5c87b9` — all above are **pushed** to `origin/fix/p0-pre-w5-gaps`.
-
-### Uncommitted / untracked WIP (not yet committed)
-
-| File | Task | Status |
-|------|------|--------|
-| `CONTRIBUTING.md` | T-073 | Written, untracked — needs `CODE_OF_CONDUCT.md` + README cross-link before committing |
-| `scripts/smoke-test.sh` | T-076 | Written, untracked — needs `chmod +x` + CI job added before committing |
-
-### Remaining tasks (T-073 → T-081)
-
-| ID | Description | Notes |
-|----|-------------|-------|
-| **T-073** | CONTRIBUTING + CODE_OF_CONDUCT + README contributing section | `CONTRIBUTING.md` already written; still need `CODE_OF_CONDUCT.md` (Contributor Covenant v2.1, contact `dcervonyj@gmail.com`) and a "Contributing" section added to `README.md` |
-| **T-076** | Bin smoke test + CI job | `scripts/smoke-test.sh` already written; `chmod +x`; add `smoke-test` job to `.github/workflows/ci.yml` (`needs: ci`) |
-| **T-077** | Adopt Changesets | `pnpm dlx @changesets/cli init`; set `baseBranch: "master"` in `.changeset/config.json`; add changeset-status check to CI `on: pull_request` |
-| **T-078** | `doc/VERSIONING.md` | Semver policy, compat matrix, `pnpm changeset` usage, major-bump regeneration requirement; cross-link from `CONTRIBUTING.md` |
-| **T-079** | npm publish workflow | `.github/workflows/release.yml` using `changesets/action@v1`; triggers on push to `master`; needs `NPM_TOKEN` secret |
-| **T-080** | `doc/API_FREEZE.md` | Full public API surface; pre-release checklist |
-| **T-081** | Cut v1.0.0 | `changeset version`; regenerate examples; `pnpm build && pnpm test`; tag `v1.0.0`; push |
-
-**Suggested order:** T-073 → T-076 → T-077 → T-078 + T-079 + T-080 (parallel) → T-081.
-
-### Key facts
-
-- All 3 examples (`basic`, `modular`, `full-blog-app`) build, run, and pass `check:codegen`
-- Generated files (`*.di.generated.ts`) are **committed** — never gitignored
-- Git author for all commits: `dcervonyj <dcervonyj@gmail.com>`
-- Commit format: `<type>(T-NNN): <imperative description>` + `Co-authored-by: Copilot` trailer
+_Cross-references: `doc/DESIGN.md` for the architectural spec, `doc/BACKLOG.md` for the full task list, `doc/REPO_GUIDE.md` for the repo map._

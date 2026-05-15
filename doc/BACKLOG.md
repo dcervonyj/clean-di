@@ -1279,4 +1279,32 @@ W6 demonstrates the library. All examples follow the same pattern, so the three 
 
 ---
 
+## W8 — Post-v1.0.0 hardening
+
+### T-083 Watch-mode integration tests
+
+- **Wave:** W8
+- **Description:** Write real integration tests for `runWatch()` using the `onReady`/`onEmit`/`_triggerChange` callbacks. Added `_triggerChange` test hook to `RunWatchOptions` to avoid chokidar FS-event flakiness on macOS tmpdir. Removed `watch.ts` from v8 coverage exclude; restored branch threshold to 78%.
+- **Status:** ✅ Done — `test/cli/watch.test.ts` (5 tests)
+
+### T-084 Multi-context emit per file
+
+- **Wave:** W8
+- **Description:** The orchestrator previously processed only `contexts[0]` per `.di.ts` file. Fixed `main.ts` and `check.ts` to loop all contexts. For N > 1 contexts, emits `foo.<varName>.di.generated.ts` per context. Added `test/fixtures/multi-context/` fixture and e2e catalog entry.
+- **Status:** ✅ Done
+
+### T-085 CLI subprocess integration tests
+
+- **Wave:** W8
+- **Description:** 11 tests invoking `dist/bin.js` as a real child process via `execFile`. Covers `--help`, `--version`, one-shot, `--check` (pass + fail), and CDI error exit codes.
+- **Status:** ✅ Done — `test/cli/bin.test.ts`
+
+### T-086 Codegen → tsc roundtrip integration tests
+
+- **Wave:** W8
+- **Description:** 3 tests that run `runOnce()` then compile the generated file with `tsc --noEmit` and assert exit 0. Covers `imports`, `lifecycle`, and `name-fallback` fixtures.
+- **Status:** ✅ Done — `test/integration/roundtrip.test.ts`
+
+---
+
 _End of backlog._
