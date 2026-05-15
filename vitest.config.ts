@@ -1,0 +1,13 @@
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    projects: [
+      "packages/clean-di/vitest.config.ts",
+      "packages/clean-di-codegen/vitest.config.ts",
+      "examples/basic/vitest.config.ts",
+      "examples/modular/vitest.config.ts",
+      "examples/full-blog-app/vitest.config.ts",
+    ],
+  },
+});
