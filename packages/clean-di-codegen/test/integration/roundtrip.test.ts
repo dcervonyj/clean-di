@@ -202,6 +202,32 @@ describe("roundtrip — codegen output compiles with tsc --noEmit", () => {
     await rm(workDir, { recursive: true, force: true });
   });
 
+  it("unambiguous fixture — generated file with inline config type compiles without errors", async () => {
+    // The unambiguous fixture defines PostsContextConfig inline in input.di.ts.
+    // The emitter must add `import { type PostsContextConfig } from "./input.di.js"`
+    // so the generated file compiles under strict tsc without any missing-type error.
+    const fixtureDir = join(FIXTURES_ROOT, "unambiguous");
+    await setupCleanDi(workDir);
+    await writeCodegenConfig(workDir);
+    await copyFixtureFiles(fixtureDir, workDir);
+
+    const result = await runOnce({
+      cwd: workDir,
+      generatorVersion: "test-0.0.0",
+      noColor: true,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.filesWritten).toBeGreaterThan(0);
+
+    // Include the source .di.ts so tsc can resolve PostsContextConfig.
+    await writeTscConfig(workDir, ["input.di.generated.ts", "input.di.ts", "*.ts"]);
+
+    const tscResult = await runTsc(workDir);
+
+    expect(tscResult.exitCode).toBe(0);
+  }, 30_000);
+
   it("imports fixture — generated file with cross-module beans compiles without errors", async () => {
     // The imports fixture exercises import-resolution and multi-file bean graphs.
     // The config type is void so no missing-import issue arises.

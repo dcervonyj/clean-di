@@ -6,6 +6,7 @@
 import { createContext } from "clean-di/runtime";
 import { Greeter } from "./Greeter";
 import { Logger } from "./Logger";
+import { type GreeterConfig } from "./input.di.js";
 
 export const greeterContext = createContext<GreeterConfig, { greeter: Greeter }>(
   (cfg) => {

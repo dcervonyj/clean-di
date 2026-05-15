@@ -7,6 +7,7 @@ import { createContext } from "clean-di/runtime";
 import { HttpPostsRepository } from "./HttpPostsRepository";
 import { ListPostsUseCase } from "./ListPostsUseCase";
 import { Logger } from "./Logger";
+import { type PostsContextConfig } from "./input.di.js";
 
 export const postsContext = createContext<PostsContextConfig, { listPosts: ListPostsUseCase }>(
   (cfg) => {
