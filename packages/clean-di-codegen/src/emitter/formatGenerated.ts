@@ -37,6 +37,17 @@ export interface EmittedBean {
 }
 
 /**
+ * A single lifecycle hook to emit.
+ * `src` is the hook's source text (re-printed verbatim from the `.di.ts`).
+ * `passCfg` is `true` when the hook function accepts a second `cfg` parameter —
+ * only then do we pass `cfg` in the IIFE call to avoid TS2554.
+ */
+export interface HookSource {
+  readonly src: string;
+  readonly passCfg: boolean;
+}
+
+/**
  * Everything `formatGenerated` needs to render a `.di.generated.ts` file.
  *
  * The orchestrator (T-042) assembles this from the analyzer outputs, then
@@ -59,12 +70,26 @@ export interface FormatGeneratedInput {
   readonly beansInTopoOrder: readonly EmittedBean[];
   /** The exposed-keys whitelist from the context's `expose: [...]` list. */
   readonly exposedKeys: readonly string[];
+  /**
+   * Map from exposed key to its TypeScript type name (e.g. `"Greeter"`).
+   * Populated for `bean(Class)` entries; falls back to `"unknown"` for
+   * `provide(...)` / synthetic config beans.
+   */
+  readonly exposedTypes: ReadonlyMap<string, string>;
   /** Header template (defaults to `DEFAULT_HEADER` from `config/defaultConfig.ts`). */
   readonly headerTemplate: string;
-  /** Source text of the `postConstruct` arrow / function expression, or undefined. */
-  readonly postConstructSource?: string;
-  /** Source text of the `preDestroy` arrow / function expression, or undefined. */
-  readonly preDestroySource?: string;
+  /**
+   * Source texts and arity flags of all postConstruct hooks to call, in order:
+   * imported configs first (depth-first), then the top-level context's hook.
+   * Empty array = no postConstruct emitted.
+   */
+  readonly postConstructSources: readonly HookSource[];
+  /**
+   * Source texts and arity flags of all preDestroy hooks to call, in order:
+   * top-level context first, then imported configs in LIFO order.
+   * Empty array = no preDestroy emitted.
+   */
+  readonly preDestroySources: readonly HookSource[];
 }
 
 /**
@@ -134,21 +159,38 @@ function renderImport(imp: EmittedImport): string {
 
 /**
  * Render the optional `postConstruct` / `preDestroy` fields for the BuildResult
- * literal. The user's hook is authored as `(beans, cfg) => ...`, but the
- * `BuildResult` shape expects `(config: unknown) => void`. We wrap the user's
- * hook in a thin adapter that supplies the locally-built bean bag.
+ * literal. Each hook is authored as `(beans, cfg?) => ...`; we wrap it in a
+ * thin adapter that supplies the locally-built bean bag.
+ *
+ * Single hook  → inline expression form: `postConstruct: (cfg) => (<hook>)({...}[, cfg]),`
+ * Multiple hooks → block form: calls each hook in sequence inside a block arrow.
  */
 function renderHookLines(input: FormatGeneratedInput, bagFields: string): readonly string[] {
   const lines: string[] = [];
 
-  if (input.postConstructSource !== undefined) {
-    lines.push(
-      `      postConstruct: (cfg) => (${input.postConstructSource})({ ${bagFields} }, cfg),`,
-    );
+  const hookCall = (hook: HookSource): string => {
+    const cfgArg = hook.passCfg ? ", cfg" : "";
+    return `(${hook.src})({ ${bagFields} }${cfgArg})`;
+  };
+
+  if (input.postConstructSources.length === 1) {
+    lines.push(`      postConstruct: (cfg) => ${hookCall(input.postConstructSources[0]!)},`);
+  } else if (input.postConstructSources.length > 1) {
+    lines.push(`      postConstruct: (cfg) => {`);
+    for (const hook of input.postConstructSources) {
+      lines.push(`        ${hookCall(hook)};`);
+    }
+    lines.push(`      },`);
   }
 
-  if (input.preDestroySource !== undefined) {
-    lines.push(`      preDestroy: (cfg) => (${input.preDestroySource})({ ${bagFields} }, cfg),`);
+  if (input.preDestroySources.length === 1) {
+    lines.push(`      preDestroy: (cfg) => ${hookCall(input.preDestroySources[0]!)},`);
+  } else if (input.preDestroySources.length > 1) {
+    lines.push(`      preDestroy: (cfg) => {`);
+    for (const hook of input.preDestroySources) {
+      lines.push(`        ${hookCall(hook)};`);
+    }
+    lines.push(`      },`);
   }
 
   return lines;
@@ -159,8 +201,9 @@ function renderExposedTypeAnnotation(input: FormatGeneratedInput): string {
     return "{}";
   }
 
-  // W3 MVP: emit `unknown` placeholders. W4 will replace these with the
-  // resolved class names once the analyzer wires up class symbols. The
-  // `createContext` second generic is structural, so this still type-checks.
-  return "{ " + input.exposedKeys.map((k) => `${k}: unknown`).join(", ") + " }";
+  return (
+    "{ " +
+    input.exposedKeys.map((k) => `${k}: ${input.exposedTypes.get(k) ?? "unknown"}`).join(", ") +
+    " }"
+  );
 }

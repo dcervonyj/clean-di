@@ -1,5 +1,5 @@
-import type { BuildResult } from "./buildResult.js";
 import type { CachedInstance, Container } from "./Container.js";
+import type { BuildResult } from "./buildResult.js";
 
 // Locally typed `console` — clean-di is framework-agnostic core (no DOM, no Node
 // types pulled in). `console.warn` is universally available in every JS runtime.
@@ -8,7 +8,7 @@ declare const console: { warn(message: string): void };
 const SINGLETON_KEY = Symbol("clean-di:singleton");
 
 export function createContext<TConfig, TExposed>(
-  builder: (config: TConfig) => BuildResult<TExposed>,
+  builder: (config: TConfig) => BuildResult<TExposed, TConfig>,
 ): Container<TConfig, TExposed> {
   const cache = new Map<unknown, CachedInstance<TExposed>>();
   const destroyedKeys = new Set<unknown>();
@@ -29,7 +29,7 @@ export function createContext<TConfig, TExposed>(
     const result = builder(config);
     const entry: CachedInstance<TExposed> = {
       exposed: result.expose,
-      preDestroy: result.preDestroy,
+      preDestroy: result.preDestroy as ((config: unknown) => void) | undefined,
       config,
     };
     cache.set(key, entry);

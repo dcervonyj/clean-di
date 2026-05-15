@@ -1,20 +1,30 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { dirname, basename } from "node:path";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { dirname, basename, relative } from "node:path";
 
-import ts from "typescript";
+import * as ts from "typescript";
 
-import type { Diagnostic } from "../diagnostics/codes.js";
-import type { DiagnosticReporter } from "../diagnostics/report.js";
-import { DEFAULT_HEADER } from "../config/defaultConfig.js";
-
-import { parseDiFile } from "../analyzer/parseDiFile.js";
+import {
+  buildBeanScopeWithImports,
+  resolveDefineConfigCall,
+  type BeanScopeEntry,
+} from "../analyzer/buildBeanScope.js";
 import { collectContexts } from "../analyzer/collectContexts.js";
-import { buildBeanScopeWithImports, type BeanScopeEntry } from "../analyzer/buildBeanScope.js";
+import type { ContextDeclaration } from "../analyzer/collectContexts.js";
+import { parseDiFile } from "../analyzer/parseDiFile.js";
 import { resolveConstructor } from "../analyzer/resolveConstructor.js";
 import { topoSort } from "../analyzer/topoSort.js";
 import { validateExpose } from "../analyzer/validateExpose.js";
-import { formatGenerated, type EmittedBean, type EmittedImport } from "./formatGenerated.js";
+import { DEFAULT_HEADER } from "../config/defaultConfig.js";
+import type { Diagnostic } from "../diagnostics/codes.js";
+import type { DiagnosticReporter } from "../diagnostics/report.js";
+
+import {
+  formatGenerated,
+  type EmittedBean,
+  type EmittedImport,
+  type HookSource,
+} from "./formatGenerated.js";
 import { hashGeneratedFile } from "./hash.js";
 
 export interface EmitInput {
@@ -26,15 +36,39 @@ export interface EmitInput {
   readonly reporter: DiagnosticReporter;
   /** clean-di-codegen package version. */
   readonly generatorVersion: string;
+  /**
+   * When true, skip writing the generated file. Returns `stale: true` if the
+   * existing file is missing or differs from what would be generated. Used by
+   * `--check` mode (DESIGN §7.9).
+   */
+  readonly dryRun?: boolean;
+  /**
+   * Index into the `contexts` array to emit. Defaults to 0.
+   * When a file contains multiple `defineContext()` calls (N > 1), callers
+   * should pass each index in turn. The output path becomes
+   * `<base>.<exportName>.di.generated.ts` when the file has more than one
+   * well-formed context.
+   */
+  readonly contextIndex?: number;
 }
 
 export interface RunResult {
   /** True if the generated file was written (or rewritten). False if skipped by hash. */
   readonly wrote: boolean;
+  /**
+   * In dryRun mode: true if the file is missing or its content differs from
+   * what would be generated. Always false in normal (write) mode.
+   */
+  readonly stale: boolean;
   /** All diagnostics raised. */
   readonly diagnostics: readonly Diagnostic[];
   /** Path of the generated file. */
   readonly outputPath: string;
+  /**
+   * Export names of all well-formed contexts found in the source file.
+   * Always populated so callers can discover N>1 contexts and loop.
+   */
+  readonly allContextNames: readonly string[];
 }
 
 /**
@@ -49,12 +83,17 @@ export interface RunResult {
  */
 export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
   const { sourcePath, program, reporter, generatorVersion } = input;
-  const outputPath = computeOutputPath(sourcePath);
+  const contextIndex = input.contextIndex ?? 0;
   const checker = program.getTypeChecker();
 
   const parsed = parseDiFile(program, sourcePath);
   const { contexts, diagnostics: shapeDiagnostics } = collectContexts(parsed);
 
+  const allContextNames = contexts.map((c) => c.exportName);
+  const multiContext = contexts.length > 1;
+
+  // For the early-out paths, still compute a meaningful outputPath.
+  const placeholderOutputPath = computeOutputPath(sourcePath, undefined);
   const allDiagnostics: Diagnostic[] = [...shapeDiagnostics];
 
   if (contexts.length === 0) {
@@ -64,11 +103,20 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
       reporter.add(d);
     }
 
-    return { wrote: false, diagnostics: allDiagnostics, outputPath };
+    return {
+      wrote: false,
+      stale: false,
+      diagnostics: allDiagnostics,
+      outputPath: placeholderOutputPath,
+      allContextNames,
+    };
   }
 
-  // W3 MVP supports a single context per file. Take the first well-formed one.
-  const context = contexts[0]!;
+  // Pick the requested context by index (defaults to 0 for backward compat).
+  const context = contexts[contextIndex] ?? contexts[0]!;
+  // When the file contains multiple contexts, include the export name in the
+  // output path so each context gets its own `.di.generated.ts` file.
+  const outputPath = computeOutputPath(sourcePath, multiContext ? context.exportName : undefined);
   const { scope: localScope, diagnostics: scopeDiagnostics } = buildBeanScopeWithImports(
     checker,
     context,
@@ -87,6 +135,12 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
 
   for (const [name, entry] of localScope) {
     if (entry.kind === "provide") {
+      resolvedArgs.set(name, []);
+      continue;
+    }
+
+    if (entry.kind === "config") {
+      // Synthetic config bean (T-046) — no constructor to resolve; emits cfg.<name>.
       resolvedArgs.set(name, []);
       continue;
     }
@@ -136,7 +190,7 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
       reporter.add(d);
     }
 
-    return { wrote: false, diagnostics: allDiagnostics, outputPath };
+    return { wrote: false, stale: false, diagnostics: allDiagnostics, outputPath, allContextNames };
   }
 
   // If we already collected non-cycle errors, still emit them but don't write.
@@ -145,7 +199,7 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
       reporter.add(d);
     }
 
-    return { wrote: false, diagnostics: allDiagnostics, outputPath };
+    return { wrote: false, stale: false, diagnostics: allDiagnostics, outputPath, allContextNames };
   }
 
   // 3d: format the generated file.
@@ -154,12 +208,17 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     if (entry.kind === "provide") {
       return { name, rhs: emitProvideRhs(entry) };
     }
+    if (entry.kind === "config") {
+      return { name, rhs: `cfg.${name}` };
+    }
     const args = resolvedArgs.get(name) ?? [];
 
     return { name, rhs: emitBeanRhs(entry, args) };
   });
 
-  const imports = collectImports(parsed.sourceFile);
+  const baseImports = collectImports(parsed.sourceFile);
+  const extraImports = collectMissingBeanImports(localScope, baseImports, outputPath);
+  const imports = [...baseImports, ...extraImports];
   const sourceFileContent = await readFile(sourcePath, "utf8");
   const hash = hashGeneratedFile({
     sourceFileContent,
@@ -167,8 +226,20 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     generatorVersion,
   });
 
-  const postConstructSource = context.postConstruct?.getText();
-  const preDestroySource = context.preDestroy?.getText();
+  const importedHooks = collectImportedLifecycleHooks(checker, context);
+
+  // postConstruct order: imported configs depth-first, then parent (DESIGN §5.6).
+  const postConstructSources: HookSource[] = [
+    ...importedHooks.postConstructSources,
+    ...(context.postConstruct !== undefined ? [toHookSource(context.postConstruct)] : []),
+  ];
+  // preDestroy order: parent first, then imports in LIFO order (DESIGN §5.6).
+  const preDestroySources: HookSource[] = [
+    ...(context.preDestroy !== undefined ? [toHookSource(context.preDestroy)] : []),
+    ...importedHooks.preDestroySources,
+  ];
+
+  const exposedTypes = buildExposedTypes(context.expose, localScope);
 
   const generated = formatGenerated({
     sourcePath: basename(sourcePath),
@@ -179,29 +250,50 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     contextExportName: context.exportName,
     beansInTopoOrder: beans,
     exposedKeys: context.expose,
+    exposedTypes,
     headerTemplate: DEFAULT_HEADER,
-    ...(postConstructSource !== undefined ? { postConstructSource } : {}),
-    ...(preDestroySource !== undefined ? { preDestroySource } : {}),
+    postConstructSources,
+    preDestroySources,
   });
+
+  // dryRun: compare against committed file without writing (DESIGN §7.9 --check).
+  if (input.dryRun === true) {
+    if (!existsSync(outputPath)) {
+      return { wrote: false, stale: true, diagnostics: [], outputPath, allContextNames };
+    }
+    const existing = await readFile(outputPath, "utf8");
+    return {
+      wrote: false,
+      stale: existing !== generated,
+      diagnostics: [],
+      outputPath,
+      allContextNames,
+    };
+  }
 
   // Hash-based skip (DESIGN §7.9).
   if (existsSync(outputPath)) {
     const existing = await readFile(outputPath, "utf8");
     const existingHashMatch = existing.match(/Hash: sha256:([0-9a-f]+)/);
     if (existingHashMatch !== null && existingHashMatch[1] === hash) {
-      return { wrote: false, diagnostics: [], outputPath };
+      return { wrote: false, stale: false, diagnostics: [], outputPath, allContextNames };
     }
   }
 
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, generated, "utf8");
 
-  return { wrote: true, diagnostics: [], outputPath };
+  return { wrote: true, stale: false, diagnostics: [], outputPath, allContextNames };
 }
 
-function computeOutputPath(sourcePath: string): string {
-  // X.di.ts → X.di.generated.ts (adjacent mode — the only mode in v1)
-  return sourcePath.replace(/\.di\.ts$/, ".di.generated.ts");
+function computeOutputPath(sourcePath: string, varName: string | undefined): string {
+  // Single-context (or single-context backward compat): X.di.ts → X.di.generated.ts
+  // Multi-context: X.di.ts → X.<varName>.di.generated.ts (one file per context)
+  if (varName === undefined) {
+    return sourcePath.replace(/\.di\.ts$/, ".di.generated.ts");
+  }
+
+  return sourcePath.replace(/\.di\.ts$/, `.${varName}.di.generated.ts`);
 }
 
 function emitProvideRhs(entry: BeanScopeEntry): string {
@@ -297,4 +389,177 @@ function collectImports(sourceFile: ts.SourceFile): readonly EmittedImport[] {
   }
 
   return imports;
+}
+
+/**
+ * Add imports for bean classes that come from imported sub-configs and are not
+ * already re-emitted by `collectImports` (which only mirrors the top-level
+ * source file's imports).
+ *
+ * For each `bean()` entry whose class declaration lives in a different source
+ * file than the `.di.ts`, emit a new `import { ClassName } from "./relative/path.js"`.
+ * Deduplicates by class name so diamond-imported classes only get one import.
+ */
+function collectMissingBeanImports(
+  localScope: ReadonlyMap<string, BeanScopeEntry>,
+  existingImports: readonly EmittedImport[],
+  outputPath: string,
+): readonly EmittedImport[] {
+  // Names already covered by the source file's re-emitted imports.
+  const alreadyImported = new Set<string>();
+  for (const imp of existingImports) {
+    for (const n of imp.named ?? []) {
+      alreadyImported.add(n.alias ?? n.name);
+    }
+    if (imp.defaultName !== undefined) {
+      alreadyImported.add(imp.defaultName);
+    }
+  }
+
+  const outputDir = dirname(outputPath);
+  const extra: EmittedImport[] = [];
+  const seen = new Set<string>();
+
+  for (const entry of localScope.values()) {
+    if (entry.kind !== "bean") continue;
+    if (entry.classDeclaration === undefined) continue;
+
+    const className = entry.classDeclaration.name?.text;
+    if (className === undefined || alreadyImported.has(className) || seen.has(className)) {
+      continue;
+    }
+    seen.add(className);
+
+    const classSourceFile = entry.classDeclaration.getSourceFile().fileName;
+    // Compute relative path from the generated file to the class's source file.
+    // Use .js extension (NodeNext ESM convention).
+    let rel = relative(outputDir, classSourceFile).replace(/\.ts$/, ".js");
+    if (!rel.startsWith(".")) {
+      rel = "./" + rel;
+    }
+    extra.push({ from: rel, named: [{ name: className }] });
+  }
+
+  return extra;
+}
+
+interface LifecycleHooks {
+  readonly postConstructSources: readonly HookSource[];
+  readonly preDestroySources: readonly HookSource[];
+}
+
+/**
+ * Convert a hook AST expression to a `HookSource`, detecting whether the
+ * function accepts a second `cfg` parameter.
+ */
+function toHookSource(expr: ts.Expression): HookSource {
+  const passCfg =
+    (ts.isArrowFunction(expr) || ts.isFunctionExpression(expr)) && expr.parameters.length >= 2;
+  return { src: expr.getText(), passCfg };
+}
+
+/**
+ * Walk the context's `imports` depth-first and collect the `postConstruct` /
+ * `preDestroy` hook source texts from every imported `defineConfig` spec in
+ * DESIGN §5.6 order.
+ *
+ * Returns ONLY the imported hooks; the caller appends/prepends the top-level
+ * context's own hook:
+ *   - postConstruct order: imported-depth-first THEN self
+ *   - preDestroy order: self THEN imported-LIFO (= reverse of postConstruct)
+ *
+ * Diamond imports are deduplicated by `ts.CallExpression` identity — the same
+ * `defineConfig` call node contributes its hooks exactly once.
+ */
+function collectImportedLifecycleHooks(
+  checker: ts.TypeChecker,
+  context: ContextDeclaration,
+): LifecycleHooks {
+  const postConstructSources: HookSource[] = [];
+  const preDestroySources: HookSource[] = [];
+  const visitedConfigs = new Set<ts.CallExpression>();
+
+  function walkImportExpr(importExpr: ts.Expression): void {
+    const configCall = resolveDefineConfigCall(checker, importExpr);
+    if (configCall === null || visitedConfigs.has(configCall)) return;
+    visitedConfigs.add(configCall);
+
+    const spec = configCall.arguments[0];
+    if (spec === undefined || !ts.isObjectLiteralExpression(spec)) return;
+
+    // Depth-first: recurse into nested imports before collecting this spec's hooks.
+    for (const nestedImport of extractImportsFromSpec(spec)) {
+      walkImportExpr(nestedImport);
+    }
+
+    const postConstruct = extractHookFromSpec(spec, "postConstruct");
+    if (postConstruct !== undefined) {
+      postConstructSources.push(toHookSource(postConstruct));
+    }
+
+    const preDestroy = extractHookFromSpec(spec, "preDestroy");
+    if (preDestroy !== undefined) {
+      // Collect in same order as postConstruct; reverse at the end.
+      preDestroySources.push(toHookSource(preDestroy));
+    }
+  }
+
+  for (const importExpr of context.imports) {
+    walkImportExpr(importExpr);
+  }
+
+  // preDestroy is the LIFO reversal of the postConstruct traversal order.
+  preDestroySources.reverse();
+
+  return { postConstructSources, preDestroySources };
+}
+
+/** Extract the `imports: [...]` elements from a defineConfig spec literal. */
+function extractImportsFromSpec(spec: ts.ObjectLiteralExpression): readonly ts.Expression[] {
+  for (const prop of spec.properties) {
+    if (!ts.isPropertyAssignment(prop)) continue;
+    if (!ts.isIdentifier(prop.name) && !ts.isStringLiteral(prop.name)) continue;
+    if (prop.name.text !== "imports") continue;
+    if (!ts.isArrayLiteralExpression(prop.initializer)) return [];
+    return [...prop.initializer.elements];
+  }
+  return [];
+}
+
+/** Extract a `postConstruct` or `preDestroy` expression from a defineConfig spec literal. */
+function extractHookFromSpec(
+  spec: ts.ObjectLiteralExpression,
+  key: "postConstruct" | "preDestroy",
+): ts.Expression | undefined {
+  for (const prop of spec.properties) {
+    if (!ts.isPropertyAssignment(prop)) continue;
+    if (!ts.isIdentifier(prop.name) && !ts.isStringLiteral(prop.name)) continue;
+    if (prop.name.text !== key) continue;
+    return prop.initializer;
+  }
+  return undefined;
+}
+
+/**
+ * Build a map from exposed key → TypeScript type name for the generated
+ * `createContext<TConfig, { ... }>` second generic.
+ *
+ * For `bean(ClassName)` entries the type name is the class name string.
+ * All other bean kinds (provide, synthetic config) fall back to "unknown".
+ */
+function buildExposedTypes(
+  exposedKeys: readonly string[],
+  scope: ReadonlyMap<string, BeanScopeEntry>,
+): ReadonlyMap<string, string> {
+  const result = new Map<string, string>();
+  for (const key of exposedKeys) {
+    const entry = scope.get(key);
+    if (entry !== undefined && entry.kind === "bean") {
+      const name = entry.classDeclaration?.name?.text ?? entry.classSymbol?.name;
+      result.set(key, name ?? "unknown");
+    } else {
+      result.set(key, "unknown");
+    }
+  }
+  return result;
 }

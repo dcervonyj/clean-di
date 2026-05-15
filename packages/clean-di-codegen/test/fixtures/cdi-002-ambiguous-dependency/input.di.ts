@@ -1,7 +1,7 @@
 import { defineContext, bean } from "clean-di";
 
-import { Logger } from "./Logger";
 import { BackupLogger } from "./BackupLogger";
+import { Logger } from "./Logger";
 import { UseCase } from "./UseCase";
 
 /**

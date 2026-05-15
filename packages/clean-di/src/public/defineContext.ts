@@ -1,4 +1,5 @@
 import type { Container } from "../runtime/Container.js";
+
 import type { Beans, ContextSpec, ExposedOf } from "./types.js";
 
 /**
@@ -60,7 +61,9 @@ export function defineContext<TConfig = void>(): <TBeans extends Beans>(
 
 /** Helper: extract the `expose` field's tuple type from a spec.
  *  Parametrised over `TConfig` (not `unknown`) because `ContextSpec`'s lifecycle
- *  hooks place `TConfig` in a contravariant position. */
+ *  hooks place `TConfig` in a contravariant position.
+ *  When the expose list contains imported bean keys (not in TBeans), falls back
+ *  to all local bean keys — the generated file provides the precise type. */
 type GetExposeKeys<
   TConfig,
   TBeans extends Beans,

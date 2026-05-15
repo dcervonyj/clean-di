@@ -1,6 +1,6 @@
 {
   "name": "clean-di-codegen",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Build-time codegen CLI for clean-di. Reads .di.ts files and emits .di.generated.ts wiring.",
   "license": "MIT",
   "type": "module",
@@ -20,7 +20,9 @@
   ],
   "scripts": {
     "build": "tsc -b",
+    "check:examples": "node dist/bin.js --check",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
   },

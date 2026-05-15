@@ -1,4 +1,4 @@
-import { readdir, stat } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -99,14 +99,17 @@ describe("e2e fixture catalog (T-053)", async () => {
         const layout = await loadFixture(fixture.path);
         try {
           const reporter = new DiagnosticReporter(() => {}, false);
-          const result = await emitGeneratedFile({
+
+          // First call: emit context 0 and discover how many contexts exist.
+          const first = await emitGeneratedFile({
             sourcePath: layout.inputPath,
             program: layout.program,
             reporter,
             generatorVersion: "1.0.0",
+            contextIndex: 0,
           });
 
-          if (!result.wrote) {
+          if (!first.wrote) {
             // Surface the diagnostics for debugging.
             // eslint-disable-next-line no-console
             console.error(
@@ -114,8 +117,35 @@ describe("e2e fixture catalog (T-053)", async () => {
               JSON.stringify(reporter.collected(), null, 2),
             );
           }
-          expect(result.wrote).toBe(true);
+          expect(first.wrote).toBe(true);
           expect(reporter.hasErrors()).toBe(false);
+
+          const isMultiContext = first.allContextNames.length > 1;
+
+          // P0-C: byte-for-byte snapshot comparison for context 0.
+          const firstGenerated = await readFile(first.outputPath, "utf8");
+          const firstSnapshotName = isMultiContext
+            ? `expected.${first.allContextNames[0]}.di.generated.ts`
+            : "expected.di.generated.ts";
+          await expect(firstGenerated).toMatchFileSnapshot(
+            join(layout.fixturePath, firstSnapshotName),
+          );
+
+          // For multi-context fixtures, emit and snapshot each additional context.
+          for (let i = 1; i < first.allContextNames.length; i++) {
+            const extra = await emitGeneratedFile({
+              sourcePath: layout.inputPath,
+              program: layout.program,
+              reporter,
+              generatorVersion: "1.0.0",
+              contextIndex: i,
+            });
+            expect(extra.wrote).toBe(true);
+            const extraGenerated = await readFile(extra.outputPath, "utf8");
+            await expect(extraGenerated).toMatchFileSnapshot(
+              join(layout.fixturePath, `expected.${first.allContextNames[i]}.di.generated.ts`),
+            );
+          }
         } finally {
           await layout.cleanup();
         }

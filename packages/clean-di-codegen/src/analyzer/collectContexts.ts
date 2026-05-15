@@ -1,4 +1,4 @@
-import ts from "typescript";
+import * as ts from "typescript";
 
 import { DEFAULT_HINTS, DEFAULT_MESSAGES, type Diagnostic } from "../diagnostics/codes.js";
 

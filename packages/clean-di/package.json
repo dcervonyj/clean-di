@@ -1,6 +1,6 @@
 {
   "name": "clean-di",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "A decorator-free, codegen-driven TypeScript dependency-injection library.",
   "license": "MIT",
   "type": "module",
@@ -23,6 +23,7 @@
   "scripts": {
     "build": "tsc -b",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
   },

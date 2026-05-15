@@ -29,7 +29,13 @@ export interface ContextSpec<TConfig, TBeans extends Beans> {
     beans: { readonly [K in keyof TBeans]: InferBeanValue<TBeans[K]> },
     config: TConfig,
   ) => void;
-  readonly expose: readonly (keyof TBeans & string)[];
+  /**
+   * Which bean keys to expose from the merged scope (local + imported).
+   * Accepts both local keys (`keyof TBeans`) and imported bean keys (which
+   * TypeScript cannot infer from the untyped `imports` list). Codegen
+   * validates that every listed key exists in the merged scope at generation time.
+   */
+  readonly expose: readonly string[];
 }
 
 export interface ConfigSpec<TBeans extends Beans> {

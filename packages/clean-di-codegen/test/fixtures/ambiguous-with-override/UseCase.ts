@@ -1,4 +1,4 @@
-import { MainLogger } from "./MainLogger";
+import type { MainLogger } from "./MainLogger";
 
 export class UseCase {
   private readonly tag = "use-case";

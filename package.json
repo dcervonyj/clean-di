@@ -14,18 +14,23 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "tracer": "vitest run runtimeTracer",
     "typecheck": "pnpm -r run typecheck",
+    "docs:api": "typedoc",
     "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo coverage"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "@vitest/coverage-v8": "^3.0.5",
     "eslint": "^8.57.1",
+    "eslint-import-resolver-typescript": "^3.6.1",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-unused-imports": "^3.2.0",
     "prettier": "^3.4.2",
+    "typedoc": "^0.28.19",
     "typescript": "^5.7.3",
     "vitest": "^3.0.5"
   }

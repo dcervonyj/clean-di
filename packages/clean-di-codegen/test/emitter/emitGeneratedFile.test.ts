@@ -2,14 +2,16 @@ import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import * as ts from "typescript";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import ts from "typescript";
 
 import { DiagnosticReporter } from "../../src/diagnostics/report";
 import { emitGeneratedFile } from "../../src/emitter/emitGeneratedFile";
 
 const FIXTURES = join(__dirname, "..", "fixtures", "unambiguous");
 const LIFECYCLE_FIXTURES = join(__dirname, "..", "fixtures", "lifecycle");
+const CONFIG_BEAN_FIXTURES = join(__dirname, "..", "fixtures", "config-bean-direct");
+const IMPORTS_LIFECYCLE_FIXTURES = join(__dirname, "..", "fixtures", "imports-with-lifecycle");
 
 async function stubCleanDi(root: string): Promise<void> {
   const cleanDiDir = join(root, "node_modules", "clean-di", "src", "public");
@@ -246,8 +248,8 @@ describe("emitGeneratedFile() — MVP integration", () => {
     // The user's hook source is emitted verbatim inside the adapter.
     expect(generated).toContain("greeter.init()");
     expect(generated).toContain("greeter.dispose()");
-    // The adapter passes the bag (`{ logger, greeter }`) and `cfg` to the user's hook.
-    expect(generated).toContain("({ logger, greeter }, cfg)");
+    // The hooks have 1 parameter (no cfg), so the bag is passed without cfg.
+    expect(generated).toContain("({ logger, greeter })");
   });
 
   it("re-emits when the generator version changes (hash mismatch)", async () => {
@@ -284,5 +286,104 @@ describe("emitGeneratedFile() — MVP integration", () => {
       generatorVersion: "2.0.0",
     });
     expect(second.wrote).toBe(true);
+  });
+
+  it("emits cfg.<name> for a constructor param resolved from a synthetic config scope entry (P0-A)", async () => {
+    // The config-bean-direct fixture has NO explicit provide() for `prefix`.
+    // The resolver matches Greeter's `prefix: string` against the synthetic
+    // config bean (kind: "config"), so the emitter must emit `cfg.prefix`,
+    // not `new unknown()`.
+    for (const file of ["input.di.ts", "Logger.ts", "Greeter.ts"]) {
+      await copyFile(join(CONFIG_BEAN_FIXTURES, file), join(workDir, file));
+    }
+
+    const sourcePath = join(workDir, "input.di.ts");
+    const program = ts.createProgram({
+      rootNames: [sourcePath],
+      options: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.NodeNext,
+        moduleResolution: ts.ModuleResolutionKind.NodeNext,
+        strict: false,
+        noEmit: true,
+        skipLibCheck: true,
+        esModuleInterop: true,
+        baseUrl: workDir,
+      },
+    });
+
+    const reporter = new DiagnosticReporter(() => {}, false);
+    const result = await emitGeneratedFile({
+      sourcePath,
+      program,
+      reporter,
+      generatorVersion: "1.0.0",
+    });
+
+    expect(result.wrote).toBe(true);
+    expect(result.diagnostics).toHaveLength(0);
+    expect(reporter.hasErrors()).toBe(false);
+
+    const generated = await readFile(result.outputPath, "utf8");
+    expect(generated).toContain("const prefix = cfg.prefix");
+    expect(generated).toContain("const greeter = new Greeter(prefix, logger)");
+    expect(generated).not.toContain("new unknown()");
+  });
+
+  it("aggregates lifecycle hooks from imported defineConfig in DESIGN §5.6 order (P0-B)", async () => {
+    // The imports-with-lifecycle fixture has helperConfig with postConstruct/preDestroy,
+    // and appContext that imports helperConfig and adds its own hooks.
+    // Expected postConstruct order: helper THEN app (imports-first).
+    // Expected preDestroy order: app THEN helper (parent-first, LIFO).
+    for (const file of ["input.di.ts", "Logger.ts", "Greeter.ts", "helperConfig.ts"]) {
+      await copyFile(join(IMPORTS_LIFECYCLE_FIXTURES, file), join(workDir, file));
+    }
+
+    const sourcePath = join(workDir, "input.di.ts");
+    const program = ts.createProgram({
+      rootNames: [sourcePath],
+      options: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.NodeNext,
+        moduleResolution: ts.ModuleResolutionKind.NodeNext,
+        strict: false,
+        noEmit: true,
+        skipLibCheck: true,
+        esModuleInterop: true,
+        baseUrl: workDir,
+      },
+    });
+
+    const reporter = new DiagnosticReporter(() => {}, false);
+    const result = await emitGeneratedFile({
+      sourcePath,
+      program,
+      reporter,
+      generatorVersion: "1.0.0",
+    });
+
+    expect(result.wrote).toBe(true);
+    expect(result.diagnostics).toHaveLength(0);
+    expect(reporter.hasErrors()).toBe(false);
+
+    const generated = await readFile(result.outputPath, "utf8");
+
+    // Block form (2 hooks each): both helperConfig and appContext hooks present.
+    expect(generated).toContain("postConstruct: (cfg) => {");
+    expect(generated).toContain("preDestroy: (cfg) => {");
+
+    // postConstruct: imported hook appears BEFORE the parent hook.
+    const helperPostIdx = generated.indexOf("helper:postConstruct");
+    const appPostIdx = generated.indexOf("greeter.greet");
+    expect(helperPostIdx).toBeGreaterThan(-1);
+    expect(appPostIdx).toBeGreaterThan(-1);
+    expect(helperPostIdx).toBeLessThan(appPostIdx);
+
+    // preDestroy: parent hook appears BEFORE the imported hook.
+    const appDestroyIdx = generated.indexOf("app:preDestroy");
+    const helperDestroyIdx = generated.indexOf("helper:preDestroy");
+    expect(appDestroyIdx).toBeGreaterThan(-1);
+    expect(helperDestroyIdx).toBeGreaterThan(-1);
+    expect(appDestroyIdx).toBeLessThan(helperDestroyIdx);
   });
 });

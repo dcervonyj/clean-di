@@ -8,3 +8,5 @@ coverage/
 !.vscode/settings.json
 *.tsbuildinfo
 .idea/
+.playwright-mcp/
+doc/api/

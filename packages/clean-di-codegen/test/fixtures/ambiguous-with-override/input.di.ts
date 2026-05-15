@@ -1,7 +1,7 @@
 import { defineContext, bean, provide } from "clean-di";
 
-import { MainLogger } from "./MainLogger";
 import { BackupLogger } from "./BackupLogger";
+import { MainLogger } from "./MainLogger";
 import { UseCase } from "./UseCase";
 
 export interface AppConfig {

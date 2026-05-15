@@ -2,8 +2,8 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import * as ts from "typescript";
 import { afterEach, describe, expect, it } from "vitest";
-import ts from "typescript";
 
 import { buildBeanScope } from "../../src/analyzer/buildBeanScope";
 import { collectContexts } from "../../src/analyzer/collectContexts";

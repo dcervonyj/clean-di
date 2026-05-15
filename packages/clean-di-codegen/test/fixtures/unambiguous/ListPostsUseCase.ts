@@ -1,4 +1,4 @@
-import { HttpPostsRepository } from "./HttpPostsRepository";
+import type { HttpPostsRepository } from "./HttpPostsRepository";
 
 export class ListPostsUseCase {
   private readonly tag = "use-case";
