@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/vue";
 import { makeObservable, observable, runInAction } from "mobx";
-import { defineComponent, h, nextTick } from "vue";
 import { afterEach, describe, expect, it } from "vitest";
+import { defineComponent, h, nextTick } from "vue";
 
 import { createMobxConnector } from "../src/mobx/createMobxConnector.js";
 import { useExpose } from "../src/useExpose.js";

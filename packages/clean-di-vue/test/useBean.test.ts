@@ -1,10 +1,10 @@
 import { cleanup, render, screen } from "@testing-library/vue";
-import { defineComponent, h } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { defineComponent, h } from "vue";
 
+import { DiProvider } from "../src/DiProvider.js";
 import { useBean } from "../src/useBean.js";
 import { useExpose } from "../src/useExpose.js";
-import { DiProvider } from "../src/DiProvider.js";
 
 import { Greeter, voidContainer } from "./helpers.js";
 
