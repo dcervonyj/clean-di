@@ -111,7 +111,6 @@ describe("e2e fixture catalog (T-053)", async () => {
 
           if (!first.wrote) {
             // Surface the diagnostics for debugging.
-            // eslint-disable-next-line no-console
             console.error(
               `Fixture ${fixture.name} diagnostics:`,
               JSON.stringify(reporter.collected(), null, 2),

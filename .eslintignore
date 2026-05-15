@@ -1,5 +1,0 @@
-node_modules/
-dist/
-coverage/
-**/*.di.generated.ts
-pnpm-lock.yaml
