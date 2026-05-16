@@ -5,6 +5,7 @@ import { blogContext } from "../src/blog/BlogContext.di.generated.js";
 import { ListCommentsUseCase } from "../src/blog/comments/ListCommentsUseCase.js";
 import { ListPostsUseCase } from "../src/blog/posts/ListPostsUseCase.js";
 import { GetCurrentUserUseCase } from "../src/blog/users/GetCurrentUserUseCase.js";
+import { lifecycleObserver } from "../src/shared/lifecycleObserver.js";
 
 // ---------------------------------------------------------------------------
 // Minimal fetch stub — same data as the example's index.ts mock.
@@ -41,8 +42,8 @@ beforeAll(() => {
   (globalThis as Record<string, unknown>)["fetch"] = stubFetch;
 });
 
-afterAll(() => {
-  blogContext.destroyAll();
+afterAll(async () => {
+  await blogContext.destroyAll();
 });
 
 describe("examples/full-blog-app — blogContext", () => {
@@ -86,5 +87,65 @@ describe("examples/full-blog-app — blogContext", () => {
     const a = blogContext.get({ config, key: KEY });
     const b = blogContext.get({ config, key: KEY });
     expect(a.listPosts).toBe(b.listPosts);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T-100: End-to-end coverage for the async lifecycle path. The blog context
+// uses an async `postConstruct` / `preDestroy` (yield-a-microtask warm-up and
+// teardown) that records its observable side-effect on `lifecycleObserver`.
+// These tests exercise the codegen + runtime async path the way an end user
+// would: define async hooks in the .di.ts, regenerate, and use the container.
+// ---------------------------------------------------------------------------
+describe("examples/full-blog-app — async lifecycle (T-100)", () => {
+  it("get() returns the exposed bag immediately; init() awaits async postConstruct", async () => {
+    lifecycleObserver.reset();
+    const key = "async-lifecycle-init";
+
+    const blog = blogContext.get({ config, key });
+
+    // The exposed beans are available synchronously.
+    expect(blog.listPosts).toBeInstanceOf(ListPostsUseCase);
+    // The async warm-up has not yet completed — it is scheduled but unawaited.
+    expect(lifecycleObserver.warmedUp).toBe(false);
+
+    await blogContext.init({ config, key });
+
+    // After init(), the async postConstruct side-effect has happened.
+    expect(lifecycleObserver.warmedUp).toBe(true);
+
+    await blogContext.destroy(key);
+  });
+
+  it("without init(), the async postConstruct is still scheduled (eventually fires)", async () => {
+    lifecycleObserver.reset();
+    const key = "async-lifecycle-no-init";
+
+    blogContext.get({ config, key });
+    // Side-effect hasn't fired yet — postConstruct yielded a microtask.
+    expect(lifecycleObserver.warmedUp).toBe(false);
+
+    // Flush the microtask queue. The scheduled promise resolves and the
+    // observable side-effect happens, even though we never called init().
+    await Promise.resolve();
+    expect(lifecycleObserver.warmedUp).toBe(true);
+
+    await blogContext.destroy(key);
+  });
+
+  it("destroy() awaits the async preDestroy", async () => {
+    lifecycleObserver.reset();
+    const key = "async-lifecycle-destroy";
+
+    blogContext.get({ config, key });
+    await blogContext.init({ config, key });
+    expect(lifecycleObserver.tornDown).toBe(false);
+
+    await blogContext.destroy(key);
+
+    // The async preDestroy yielded a microtask before flipping `tornDown`.
+    // Because destroy() awaited the returned promise, the side-effect is
+    // visible by the time destroy() resolves.
+    expect(lifecycleObserver.tornDown).toBe(true);
   });
 });

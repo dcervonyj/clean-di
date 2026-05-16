@@ -1,6 +1,7 @@
 import { defineContext, bean, provide } from "clean-di";
 
 import { Logger } from "../shared/Logger.js";
+import { lifecycleObserver } from "../shared/lifecycleObserver.js";
 
 import type { BlogConfig } from "./BlogConfig.js";
 import { commentsConfig } from "./comments/CommentsConfig.di.js";
@@ -23,7 +24,20 @@ export const blogContext = defineContext<BlogConfig>()({
     listPosts: bean(ListPostsUseCase),
     createPost: bean(CreatePostUseCase),
   },
-  postConstruct: ({ logger }, cfg) => logger.info(`blog ready — ${cfg.apiBaseUrl}`),
-  preDestroy: ({ logger }, _cfg) => logger.info("blog destroyed"),
+  // Async warm-up: yield a microtask so the runtime exercises the async
+  // postConstruct path end-to-end. The observable side-effect is recorded on
+  // `lifecycleObserver` so the example E2E test suite can assert it (T-100).
+  postConstruct: async ({ logger }, cfg) => {
+    await Promise.resolve();
+    lifecycleObserver.warmedUp = true;
+    logger.info(`blog ready — ${cfg.apiBaseUrl}`);
+  },
+  // Async teardown: yield a microtask before recording the observable side-
+  // effect, so the runtime's async preDestroy path is exercised end-to-end.
+  preDestroy: async ({ logger }, _cfg) => {
+    await Promise.resolve();
+    lifecycleObserver.tornDown = true;
+    logger.info("blog destroyed");
+  },
   expose: ["listPosts", "createPost", "listComments", "deleteComment", "getCurrentUser"],
 });
