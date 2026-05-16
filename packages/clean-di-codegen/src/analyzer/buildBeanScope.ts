@@ -114,6 +114,17 @@ export function buildBeanScopeWithImports(
 
     const entry = buildEntry(checker, beanDecl.name, beanDecl, /* imported */ false);
     scope.set(beanDecl.name, entry);
+
+    if (beanDecl.kind === "provide") {
+      const provideDiag = validateProvideReturnType(
+        checker,
+        beanDecl.name,
+        beanDecl.callExpression,
+      );
+      if (provideDiag !== undefined) {
+        diagnostics.push(provideDiag);
+      }
+    }
   }
 
   return { scope, diagnostics };
@@ -173,16 +184,65 @@ function walkImport(
   for (const beanDecl of extractBeansFromSpec(spec)) {
     const existing = scope.get(beanDecl.name);
     if (existing !== undefined && existing.kind !== "config") {
-      // Already in scope via another imported config — same-name collisions
-      // between two distinct imports are not addressed at MVP scope; we keep
-      // the first occurrence. (T-053 / future work can tighten this.)
+      // Already in scope via another imported config — keep the first
+      // occurrence by AST identity. BUT: if the same logical bean is reached
+      // via two different `defineConfig` calls with diverging `overrides`,
+      // emit CDI-013 — one set would silently win at runtime.
+      const candidate = buildEntry(checker, beanDecl.name, beanDecl, /* imported */ true);
+      if (
+        existing.source !== candidate.source &&
+        overridesDiffer(existing.overrides, candidate.overrides)
+      ) {
+        const source = beanDecl.callExpression.getSourceFile();
+        const { line, character } = source.getLineAndCharacterOfPosition(
+          beanDecl.callExpression.getStart(),
+        );
+        diagnostics.push({
+          code: "CDI-013",
+          file: source.fileName,
+          line: line + 1,
+          column: character + 1,
+          message: `ConflictingImportOverrides: bean '${beanDecl.name}' is imported via two configs with diverging overrides: ${JSON.stringify(existing.overrides)} vs ${JSON.stringify(candidate.overrides)}.`,
+          hint: "Align the `overrides` maps in both imported configs, or remove one of the duplicate imports.",
+        });
+      }
       // Synthetic config entries (kind === "config") are name-fallback
       // defaults and are explicitly shadowable by explicit declarations.
       continue;
     }
     const entry = buildEntry(checker, beanDecl.name, beanDecl, /* imported */ true);
     scope.set(beanDecl.name, entry);
+
+    if (beanDecl.kind === "provide") {
+      const provideDiag = validateProvideReturnType(
+        checker,
+        beanDecl.name,
+        beanDecl.callExpression,
+      );
+      if (provideDiag !== undefined) {
+        diagnostics.push(provideDiag);
+      }
+    }
   }
+}
+
+/**
+ * Compare two `overrides: Record<string, string>` maps for inequality. Used by
+ * CDI-013 to detect diamond imports that pull in the same bean with diverging
+ * override maps.
+ */
+function overridesDiffer(
+  a: Readonly<Record<string, string>>,
+  b: Readonly<Record<string, string>>,
+): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return true;
+  for (const k of aKeys) {
+    if (a[k] !== b[k]) return true;
+  }
+
+  return false;
 }
 
 /**
@@ -346,6 +406,63 @@ function buildEntry(
     overrides: {},
     source: call,
     imported,
+  };
+}
+
+/**
+ * Validate that a `provide<T>(factory)` entry's factory return type is
+ * assignable to the declared generic `T`. Emit CDI-012 when the factory
+ * returns something incompatible. Skipped when `<T>` is absent or is `any` /
+ * `unknown` (an explicit opt-out by the user).
+ */
+function validateProvideReturnType(
+  checker: ts.TypeChecker,
+  beanName: string,
+  call: ts.CallExpression,
+): Diagnostic | undefined {
+  const typeArgNode = call.typeArguments?.[0];
+  if (typeArgNode === undefined) return undefined;
+
+  // Skip the check for `any` / `unknown` — these are deliberate opt-outs.
+  if (
+    typeArgNode.kind === ts.SyntaxKind.AnyKeyword ||
+    typeArgNode.kind === ts.SyntaxKind.UnknownKeyword
+  ) {
+    return undefined;
+  }
+
+  const declaredType = checker.getTypeFromTypeNode(typeArgNode);
+  if (declaredType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
+    return undefined;
+  }
+
+  const factoryArg = call.arguments[0];
+  if (factoryArg === undefined) return undefined;
+
+  const factoryType = checker.getTypeAtLocation(factoryArg);
+  const callSignatures = factoryType.getCallSignatures();
+  if (callSignatures.length === 0) return undefined;
+
+  const actualReturnType = checker.getReturnTypeOfSignature(callSignatures[0]!);
+
+  // The factory might be inferred as returning T (matching the generic) when
+  // contextual typing pulled the generic through — that's the success path.
+  if (checker.isTypeAssignableTo(actualReturnType, declaredType)) {
+    return undefined;
+  }
+
+  const source = call.getSourceFile();
+  const { line, character } = source.getLineAndCharacterOfPosition(call.getStart());
+  const declaredText = checker.typeToString(declaredType);
+  const actualText = checker.typeToString(actualReturnType);
+
+  return {
+    code: "CDI-012",
+    file: source.fileName,
+    line: line + 1,
+    column: character + 1,
+    message: `ProvideTypeMismatch: bean '${beanName}' declares \`provide<${declaredText}>\` but the factory returns '${actualText}'.`,
+    hint: `Make the factory return a value assignable to '${declaredText}', or change the \`provide<T>\` generic to match the actual return type.`,
   };
 }
 

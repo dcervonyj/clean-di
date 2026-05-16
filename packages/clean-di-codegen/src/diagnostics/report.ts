@@ -1,6 +1,6 @@
 import { createColors } from "picocolors";
 
-import type { Diagnostic } from "./codes.js";
+import { DIAGNOSTIC_SEVERITIES, type Diagnostic } from "./codes.js";
 import { formatDiagnostic } from "./formatDiagnostic.js";
 
 /**
@@ -50,7 +50,7 @@ export class DiagnosticReporter {
   }
 
   hasErrors(): boolean {
-    return this.entries.length > 0;
+    return this.entries.some((d) => DIAGNOSTIC_SEVERITIES[d.code] === "error");
   }
 
   /** Test/integration convenience. Returns a defensive copy. */
@@ -63,7 +63,9 @@ export class DiagnosticReporter {
     // picocolors' default auto-detection disables color in non-TTY (e.g. vitest)
     // streams, which would defeat the explicit `isTty: true` opt-in.
     const colors = createColors(true);
-    const codePattern = new RegExp(`(error ${d.code}:)`);
-    return formatted.replace(codePattern, colors.red("$1"));
+    const severity = DIAGNOSTIC_SEVERITIES[d.code];
+    const codePattern = new RegExp(`(${severity} ${d.code}:)`);
+    const colorFn = severity === "warning" ? colors.yellow : colors.red;
+    return formatted.replace(codePattern, colorFn("$1"));
   }
 }
