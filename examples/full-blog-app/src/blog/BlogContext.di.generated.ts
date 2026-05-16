@@ -18,84 +18,33 @@ import { DeleteCommentUseCase } from "./comments/DeleteCommentUseCase.js";
 import { HttpUsersRepository } from "./users/HttpUsersRepository.js";
 import { GetCurrentUserUseCase } from "./users/GetCurrentUserUseCase.js";
 
-export const blogContext = createContext<
-  BlogConfig,
-  {
-    listPosts: ListPostsUseCase;
-    createPost: CreatePostUseCase;
-    listComments: ListCommentsUseCase;
-    deleteComment: DeleteCommentUseCase;
-    getCurrentUser: GetCurrentUserUseCase;
-  }
->((cfg) => {
-  const apiBaseUrl = cfg.apiBaseUrl;
-  const authToken = cfg.authToken;
-  const logger = new Logger("blog");
-  const commentsRepository = new HttpCommentsRepository(apiBaseUrl, authToken, logger);
-  const listComments = new ListCommentsUseCase(commentsRepository);
-  const deleteComment = new DeleteCommentUseCase(commentsRepository);
-  const usersRepository = new HttpUsersRepository(apiBaseUrl, authToken, logger);
-  const getCurrentUser = new GetCurrentUserUseCase(usersRepository);
-  const postsRepository = new HttpPostsRepository(apiBaseUrl, authToken, logger);
-  const listPosts = new ListPostsUseCase(postsRepository);
-  const createPost = new CreatePostUseCase(postsRepository);
+export const blogContext = createContext<BlogConfig, { listPosts: ListPostsUseCase, createPost: CreatePostUseCase, listComments: ListCommentsUseCase, deleteComment: DeleteCommentUseCase, getCurrentUser: GetCurrentUserUseCase }>(
+  (cfg) => {
+    const apiBaseUrl = cfg.apiBaseUrl;
+    const authToken = cfg.authToken;
+    const logger = new Logger("blog");
+    const commentsRepository = new HttpCommentsRepository(apiBaseUrl, authToken, logger);
+    const listComments = new ListCommentsUseCase(commentsRepository);
+    const deleteComment = new DeleteCommentUseCase(commentsRepository);
+    const usersRepository = new HttpUsersRepository(apiBaseUrl, authToken, logger);
+    const getCurrentUser = new GetCurrentUserUseCase(usersRepository);
+    const postsRepository = new HttpPostsRepository(apiBaseUrl, authToken, logger);
+    const listPosts = new ListPostsUseCase(postsRepository);
+    const createPost = new CreatePostUseCase(postsRepository);
 
-  return {
-    bag: {
-      apiBaseUrl,
-      authToken,
-      logger,
-      commentsRepository,
-      listComments,
-      deleteComment,
-      usersRepository,
-      getCurrentUser,
-      postsRepository,
-      listPosts,
-      createPost,
-    },
-    expose: { listPosts, createPost, listComments, deleteComment, getCurrentUser },
-    postConstruct: (cfg) =>
-      (async ({ logger }, cfg) => {
-        await Promise.resolve();
-        lifecycleObserver.warmedUp = true;
-        logger.info(`blog ready — ${cfg.apiBaseUrl}`);
-      })(
-        {
-          apiBaseUrl,
-          authToken,
-          logger,
-          commentsRepository,
-          listComments,
-          deleteComment,
-          usersRepository,
-          getCurrentUser,
-          postsRepository,
-          listPosts,
-          createPost,
-        },
-        cfg,
-      ),
-    preDestroy: (cfg) =>
-      (async ({ logger }, _cfg) => {
-        await Promise.resolve();
-        lifecycleObserver.tornDown = true;
-        logger.info("blog destroyed");
-      })(
-        {
-          apiBaseUrl,
-          authToken,
-          logger,
-          commentsRepository,
-          listComments,
-          deleteComment,
-          usersRepository,
-          getCurrentUser,
-          postsRepository,
-          listPosts,
-          createPost,
-        },
-        cfg,
-      ),
-  };
-});
+    return {
+      bag: { apiBaseUrl, authToken, logger, commentsRepository, listComments, deleteComment, usersRepository, getCurrentUser, postsRepository, listPosts, createPost },
+      expose: { listPosts, createPost, listComments, deleteComment, getCurrentUser },
+      postConstruct: (cfg) => (async ({ logger }, cfg) => {
+    await Promise.resolve();
+    lifecycleObserver.warmedUp = true;
+    logger.info(`blog ready — ${cfg.apiBaseUrl}`);
+  })({ apiBaseUrl, authToken, logger, commentsRepository, listComments, deleteComment, usersRepository, getCurrentUser, postsRepository, listPosts, createPost }, cfg),
+      preDestroy: (cfg) => (async ({ logger }, _cfg) => {
+    await Promise.resolve();
+    lifecycleObserver.tornDown = true;
+    logger.info("blog destroyed");
+  })({ apiBaseUrl, authToken, logger, commentsRepository, listComments, deleteComment, usersRepository, getCurrentUser, postsRepository, listPosts, createPost }, cfg),
+    };
+  },
+);
