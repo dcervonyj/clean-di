@@ -9,6 +9,7 @@ export { defineContext } from "./public/defineContext.js";
 export { defineConfig } from "./public/defineConfig.js";
 export { provide } from "./public/provide.js";
 export { bean } from "./public/bean.js";
+export { createScope } from "./runtime/createScope.js";
 
 export type { Container } from "./runtime/Container.js";
 export type { BeanDef, ContextSpec, ConfigSpec } from "./public/types.js";
