@@ -5,7 +5,9 @@ import * as api from "../../src/index";
 describe("public API surface (clean-di)", () => {
   it("exports exactly the names listed in DESIGN §6.4", () => {
     const names = Object.keys(api).sort();
-    expect(names).toEqual(["bean", "defineConfig", "defineContext", "provide"].sort());
+    expect(names).toEqual(
+      ["bean", "createScope", "defineConfig", "defineContext", "provide"].sort(),
+    );
   });
 
   it("does not leak internal markers (no BeanMarker, ProvideMarker, DefinedConfig values)", () => {
