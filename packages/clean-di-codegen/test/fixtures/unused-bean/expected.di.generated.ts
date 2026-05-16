@@ -8,13 +8,15 @@ import { Greeter } from "./Greeter";
 import { Logger } from "./Logger";
 import { Orphan } from "./Orphan";
 
-export const ctx = createContext<void, { greeter: Greeter }>((cfg) => {
-  const logger = new Logger();
-  const greeter = new Greeter(logger);
-  const orphan = new Orphan();
+export const ctx = createContext<void, { greeter: Greeter }>(
+  (cfg) => {
+    const logger = new Logger();
+    const greeter = new Greeter(logger);
+    const orphan = new Orphan();
 
-  return {
-    bag: { logger, greeter, orphan },
-    expose: { greeter },
-  };
-});
+    return {
+      bag: { logger, greeter, orphan },
+      expose: { greeter },
+    };
+  },
+);

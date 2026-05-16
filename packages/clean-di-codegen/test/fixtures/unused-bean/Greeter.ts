@@ -1,4 +1,4 @@
-import { Logger } from "./Logger";
+import type { Logger } from "./Logger";
 
 export class Greeter {
   constructor(private readonly logger: Logger) {}
