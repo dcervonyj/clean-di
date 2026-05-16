@@ -349,6 +349,120 @@ describe("createContext()", () => {
 
       await expect(ctx.init({})).rejects.toThrow(/CDIE-106/);
     });
+
+    it("sync postConstruct throw without preDestroy: still throws CDIE-103 (no cleanup needed)", () => {
+      const ctx = createContext<void, object>(() => ({
+        bag: {},
+        expose: {},
+        postConstruct: () => {
+          throw new Error("init failed");
+        },
+      }));
+
+      expect(() => ctx.get({})).toThrow(/CDIE-103/);
+    });
+
+    it("sync postConstruct throw with async preDestroy that resolves: cleanup is scheduled, error rethrown", () => {
+      const preDestroy = vi.fn(async () => {
+        await Promise.resolve();
+      });
+      const ctx = createContext<void, object>(() => ({
+        bag: {},
+        expose: {},
+        postConstruct: () => {
+          throw new Error("init failed");
+        },
+        preDestroy,
+      }));
+
+      expect(() => ctx.get({})).toThrow(/CDIE-103/);
+      expect(preDestroy).toHaveBeenCalled();
+    });
+
+    it("sync postConstruct throw with async preDestroy that rejects: rejection swallowed, original error rethrown", async () => {
+      const preDestroyError = new Error("cleanup failed");
+      const preDestroy = vi.fn(async () => {
+        await Promise.resolve();
+        throw preDestroyError;
+      });
+      const ctx = createContext<void, object>(() => ({
+        bag: {},
+        expose: {},
+        postConstruct: () => {
+          throw new Error("init failed");
+        },
+        preDestroy,
+      }));
+
+      // Track unhandled rejections to verify async preDestroy rejection is swallowed.
+      const unhandled: unknown[] = [];
+      const onUnhandled = (reason: unknown): void => {
+        unhandled.push(reason);
+      };
+      process.on("unhandledRejection", onUnhandled);
+
+      try {
+        expect(() => ctx.get({})).toThrow(/init failed/);
+        // Allow microtasks (and any unhandled rejection emission) to flush.
+        await new Promise<void>((res) => setImmediate(res));
+        expect(unhandled).not.toContain(preDestroyError);
+      } finally {
+        process.off("unhandledRejection", onUnhandled);
+      }
+
+      expect(preDestroy).toHaveBeenCalled();
+    });
+
+    it("async postConstruct rejection without preDestroy: still throws CDIE-103 (no cleanup)", async () => {
+      const ctx = createContext<void, object>(() => ({
+        bag: {},
+        expose: {},
+        postConstruct: async () => {
+          await Promise.resolve();
+          throw new Error("async init failed");
+        },
+      }));
+
+      ctx.get({});
+      await expect(ctx.init({})).rejects.toThrow(/CDIE-103/);
+    });
+
+    it("async postConstruct rejection with async preDestroy: cleanup is awaited and rejection swallowed", async () => {
+      const preDestroy = vi.fn(async () => {
+        await Promise.resolve();
+        throw new Error("async cleanup failed");
+      });
+      const ctx = createContext<void, object>(() => ({
+        bag: {},
+        expose: {},
+        postConstruct: async () => {
+          await Promise.resolve();
+          throw new Error("async init failed");
+        },
+        preDestroy,
+      }));
+
+      ctx.get({});
+      await expect(ctx.init({})).rejects.toThrow(/async init failed/);
+      expect(preDestroy).toHaveBeenCalled();
+    });
+
+    it("async postConstruct rejection with sync preDestroy: cleanup runs, original error rethrown", async () => {
+      const preDestroy = vi.fn();
+      const ctx = createContext<void, object>(() => ({
+        bag: {},
+        expose: {},
+        postConstruct: async () => {
+          await Promise.resolve();
+          throw new Error("async init failed");
+        },
+        preDestroy,
+      }));
+
+      ctx.get({});
+      await expect(ctx.init({})).rejects.toThrow(/CDIE-103/);
+      expect(preDestroy).toHaveBeenCalled();
+    });
   });
 
   describe("CDIE-105 runtime circular dependency detection", () => {
