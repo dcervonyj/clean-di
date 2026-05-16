@@ -254,6 +254,48 @@ describe("createContext()", () => {
       expect(() => ctx.get({})).not.toThrow(/CDIE-101/);
     });
 
+    it("async postConstruct rejection: subsequent get() returns a freshly constructed instance (not the dead one)", async () => {
+      // T-100: explicit regression for the cleanup-after-async-rejection path.
+      // After the rejected init() evicts the cache entry, the next get() must
+      // re-run the builder rather than hand back the stale exposed reference.
+      let buildCounter = 0;
+      const preDestroy = vi.fn();
+      let shouldFail = true;
+
+      const ctx = createContext<void, { id: number }>(() => {
+        buildCounter += 1;
+        const id = buildCounter;
+
+        return {
+          bag: { id },
+          expose: { id },
+          postConstruct: async () => {
+            await Promise.resolve();
+            if (shouldFail) {
+              throw new Error("async init failed");
+            }
+          },
+          preDestroy,
+        };
+      });
+
+      const first = ctx.get({});
+      expect(first.id).toBe(1);
+      await expect(ctx.init({})).rejects.toThrow(/CDIE-103/);
+      expect(preDestroy).toHaveBeenCalledTimes(1);
+
+      // Cache entry was deleted → next get() runs the builder again, producing
+      // a fresh exposed reference (different identity, different id).
+      shouldFail = false;
+      const second = ctx.get({});
+      expect(second).not.toBe(first);
+      expect(second.id).toBe(2);
+      // The successful init() after a rebuild is idempotent (no extra
+      // preDestroy invocations from the previous failure leak through).
+      await expect(ctx.init({})).resolves.toBeUndefined();
+      expect(preDestroy).toHaveBeenCalledTimes(1);
+    });
+
     it("async preDestroy: destroy() awaits it", async () => {
       let resolveTeardown!: () => void;
       const teardownReady = new Promise<void>((res) => {
@@ -348,6 +390,24 @@ describe("createContext()", () => {
       }));
 
       await expect(ctx.init({})).rejects.toThrow(/CDIE-106/);
+    });
+
+    it("CDIE-106: init() for an explicit key without a prior get() throws (does NOT silently no-op)", async () => {
+      // T-100: a previous get() for a different key must NOT mask the
+      // init-before-get misuse for the requested key.
+      const builderSpy = vi.fn(() => ({
+        bag: {},
+        expose: {} as object,
+        postConstruct: async () => undefined,
+      }));
+      const ctx = createContext<void, object>(builderSpy);
+
+      ctx.get({ key: "tenant-a" });
+      builderSpy.mockClear();
+
+      await expect(ctx.init({ key: "tenant-b" })).rejects.toThrow(/CDIE-106/);
+      // The misuse guard must not have triggered a builder run for tenant-b.
+      expect(builderSpy).not.toHaveBeenCalled();
     });
 
     it("sync postConstruct throw without preDestroy: still throws CDIE-103 (no cleanup needed)", () => {
