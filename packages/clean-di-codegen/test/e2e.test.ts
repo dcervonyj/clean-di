@@ -119,6 +119,13 @@ describe("e2e fixture catalog (T-053)", async () => {
           expect(first.wrote).toBe(true);
           expect(reporter.hasErrors()).toBe(false);
 
+          // Positive fixtures may still assert warning-severity diagnostics
+          // (e.g. CDI-011) via expected-diagnostics.json.
+          if (layout.expectedDiagnostics !== undefined) {
+            const match = matchesExpected(reporter.collected(), layout.expectedDiagnostics);
+            expect(match.ok, match.reason).toBe(true);
+          }
+
           const isMultiContext = first.allContextNames.length > 1;
 
           // P0-C: byte-for-byte snapshot comparison for context 0.

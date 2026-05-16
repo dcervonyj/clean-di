@@ -19,6 +19,10 @@ export const DIAGNOSTIC_CODES = {
   CDI_008: "CDI-008",
   CDI_009: "CDI-009",
   CDI_010: "CDI-010",
+  CDI_011: "CDI-011",
+  CDI_012: "CDI-012",
+  CDI_013: "CDI-013",
+  CDI_014: "CDI-014",
 
   // Runtime errors (informational — emitted by clean-di runtime, defined here so
   // the codegen can reference them in messages / docs without circular imports)
@@ -29,6 +33,33 @@ export const DIAGNOSTIC_CODES = {
 } as const;
 
 export type DiagnosticCode = (typeof DIAGNOSTIC_CODES)[keyof typeof DIAGNOSTIC_CODES];
+
+/**
+ * Severity per diagnostic code. Warnings are emitted but do not block file
+ * generation; errors do.
+ */
+export type DiagnosticSeverity = "error" | "warning";
+
+export const DIAGNOSTIC_SEVERITIES: Readonly<Record<DiagnosticCode, DiagnosticSeverity>> = {
+  "CDI-001": "error",
+  "CDI-002": "error",
+  "CDI-003": "error",
+  "CDI-004": "error",
+  "CDI-005": "error",
+  "CDI-006": "error",
+  "CDI-007": "error",
+  "CDI-008": "error",
+  "CDI-009": "error",
+  "CDI-010": "error",
+  "CDI-011": "warning",
+  "CDI-012": "error",
+  "CDI-013": "error",
+  "CDI-014": "error",
+  "CDIE-101": "error",
+  "CDIE-102": "warning",
+  "CDIE-103": "error",
+  "CDIE-104": "error",
+};
 
 /**
  * A single diagnostic produced by the codegen analyzer.
@@ -64,6 +95,13 @@ export const DEFAULT_MESSAGES: Readonly<Record<DiagnosticCode, string>> = {
   "CDI-009":
     "ConfigTypeNotFound: the `defineContext<TConfig>()` type parameter could not be resolved.",
   "CDI-010": "InvalidImport: `imports` entry is not a `defineConfig(...)` result.",
+  "CDI-011": "UnusedBean: bean declared in scope but never referenced by another bean or `expose`.",
+  "CDI-012":
+    "ProvideTypeMismatch: `provide<T>(factory)` factory return type is not assignable to T.",
+  "CDI-013":
+    "ConflictingImportOverrides: the same bean is pulled in via two imports with different `overrides`.",
+  "CDI-014":
+    "InvalidHookSignature: lifecycle hook signature does not match the expected beans/config parameters.",
   "CDIE-101": "Container.get() called for a key after destroy().",
   "CDIE-102": "Container.destroy() called for an unknown key (warning, not fatal).",
   "CDIE-103": "postConstruct threw during context build.",
@@ -86,6 +124,14 @@ export const DEFAULT_HINTS: Readonly<Record<DiagnosticCode, string>> = {
   "CDI-008": "Use `provide(() => Class.factory(...))` to construct manually.",
   "CDI-009": "Import the type or fix the reference in `defineContext<TConfig>()`.",
   "CDI-010": "Pass the result of `defineConfig({...})`, not a raw object or `bean(...)` call.",
+  "CDI-011":
+    "Remove the bean from `beans`, reference it from another bean's constructor, or add it to `expose`.",
+  "CDI-012":
+    "Make the factory return a value assignable to T, or change the `provide<T>` generic to match.",
+  "CDI-013":
+    "Align the `overrides` maps in both imported configs, or remove one of the duplicate imports.",
+  "CDI-014":
+    "Match the hook signature to `({ ...beans }: Beans, cfg: TConfig) => void | Promise<void>`.",
   "CDIE-101": "Use a fresh `key` after `destroy()` or create a new container.",
   "CDIE-102": "This warning is benign if the key was never used; otherwise verify lifecycle.",
   "CDIE-103": "See the `cause` of the thrown error for the original failure.",

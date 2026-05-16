@@ -11,12 +11,14 @@ import {
 } from "../analyzer/buildBeanScope.js";
 import { collectContexts } from "../analyzer/collectContexts.js";
 import type { ContextDeclaration } from "../analyzer/collectContexts.js";
+import { detectUnusedBeans } from "../analyzer/detectUnusedBeans.js";
 import { parseDiFile } from "../analyzer/parseDiFile.js";
 import { resolveConstructor } from "../analyzer/resolveConstructor.js";
 import { topoSort } from "../analyzer/topoSort.js";
 import { validateExpose } from "../analyzer/validateExpose.js";
+import { validateHooks } from "../analyzer/validateHooks.js";
 import { DEFAULT_HEADER } from "../config/defaultConfig.js";
-import type { Diagnostic } from "../diagnostics/codes.js";
+import { DIAGNOSTIC_SEVERITIES, type Diagnostic } from "../diagnostics/codes.js";
 import type { DiagnosticReporter } from "../diagnostics/report.js";
 
 import {
@@ -122,12 +124,16 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     context,
   );
 
-  // Merge scope-resolution diagnostics (CDI-006, CDI-010) into the running list.
+  // Merge scope-resolution diagnostics (CDI-006, CDI-010, CDI-012, CDI-013) into
+  // the running list.
   allDiagnostics.push(...scopeDiagnostics);
 
   // Validate the `expose` whitelist (CDI-004) — every exposed name must exist
   // in the assembled scope.
   allDiagnostics.push(...validateExpose(context, localScope));
+
+  // Validate lifecycle hook signatures (CDI-014) — independent of bean wiring.
+  allDiagnostics.push(...validateHooks(context, localScope, checker));
 
   // 3b: resolve each bean's constructor.
   const resolvedArgs = new Map<string, readonly (string | null)[]>();
@@ -193,13 +199,26 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     return { wrote: false, stale: false, diagnostics: allDiagnostics, outputPath, allContextNames };
   }
 
-  // If we already collected non-cycle errors, still emit them but don't write.
-  if (allDiagnostics.length > 0) {
+  // Detect unused beans on the resolved graph — emits CDI-011 warnings, which
+  // do not block emission. Runs after `topoSort` because it needs a valid graph.
+  allDiagnostics.push(...detectUnusedBeans({ scope: localScope, graph, expose: context.expose }));
+
+  // If we already collected any error-severity diagnostics, surface them and
+  // skip writing. Warning-severity diagnostics (e.g. CDI-011) still allow the
+  // generated file to be emitted.
+  const hasErrors = allDiagnostics.some((d) => DIAGNOSTIC_SEVERITIES[d.code] === "error");
+  if (hasErrors) {
     for (const d of allDiagnostics) {
       reporter.add(d);
     }
 
     return { wrote: false, stale: false, diagnostics: allDiagnostics, outputPath, allContextNames };
+  }
+
+  // Surface warning-severity diagnostics now (e.g. CDI-011) — they are
+  // informational and the file will still be written below.
+  for (const d of allDiagnostics) {
+    reporter.add(d);
   }
 
   // 3d: format the generated file.
@@ -270,13 +289,19 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
   // dryRun: compare against committed file without writing (DESIGN §7.9 --check).
   if (input.dryRun === true) {
     if (!existsSync(outputPath)) {
-      return { wrote: false, stale: true, diagnostics: [], outputPath, allContextNames };
+      return {
+        wrote: false,
+        stale: true,
+        diagnostics: allDiagnostics,
+        outputPath,
+        allContextNames,
+      };
     }
     const existing = await readFile(outputPath, "utf8");
     return {
       wrote: false,
       stale: existing !== generated,
-      diagnostics: [],
+      diagnostics: allDiagnostics,
       outputPath,
       allContextNames,
     };
@@ -287,14 +312,20 @@ export async function emitGeneratedFile(input: EmitInput): Promise<RunResult> {
     const existing = await readFile(outputPath, "utf8");
     const existingHashMatch = existing.match(/Hash: sha256:([0-9a-f]+)/);
     if (existingHashMatch !== null && existingHashMatch[1] === hash) {
-      return { wrote: false, stale: false, diagnostics: [], outputPath, allContextNames };
+      return {
+        wrote: false,
+        stale: false,
+        diagnostics: allDiagnostics,
+        outputPath,
+        allContextNames,
+      };
     }
   }
 
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, generated, "utf8");
 
-  return { wrote: true, stale: false, diagnostics: [], outputPath, allContextNames };
+  return { wrote: true, stale: false, diagnostics: allDiagnostics, outputPath, allContextNames };
 }
 
 function computeOutputPath(sourcePath: string, varName: string | undefined): string {
